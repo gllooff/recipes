@@ -7,11 +7,26 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <main class="app">
+  <section id="auth-screen" class="auth-screen hidden" aria-label="Sign in">
+    <div class="auth-card">
+      <p class="eyebrow">Personal cookbook</p>
+      <h1>Recipe book</h1>
+      <p class="subtitle">Private — sign in to continue.</p>
+      <form id="auth-form" class="auth-form">
+        <label>Email <input id="auth-email" type="email" required autocomplete="email"></label>
+        <label>Password <input id="auth-password" type="password" required autocomplete="current-password"></label>
+        <button type="submit">Sign in</button>
+        <p id="auth-error" class="status error hidden" role="alert"></p>
+      </form>
+    </div>
+  </section>
+
+  <main id="app" class="app">
     <header>
       <p class="eyebrow">Personal cookbook</p>
       <h1>Recipe book</h1>
       <p class="subtitle">Record and browse your favourite dishes.</p>
+      <button type="button" id="logout" class="secondary logout hidden">Sign out</button>
     </header>
 
     <section id="config-banner" class="config-banner hidden" aria-live="polite">

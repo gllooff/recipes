@@ -11,6 +11,16 @@ const emptyEl = document.querySelector("#empty");
 const statusEl = document.querySelector("#status");
 const banner = document.querySelector("#config-banner");
 
+const appEl = document.querySelector("#app");
+const authScreen = document.querySelector("#auth-screen");
+const authForm = document.querySelector("#auth-form");
+const authEmail = document.querySelector("#auth-email");
+const authPassword = document.querySelector("#auth-password");
+const authError = document.querySelector("#auth-error");
+const logoutBtn = document.querySelector("#logout");
+
+let isAuthed = false;
+
 const editors = {
   ingredient: document.querySelector("#ingredients-editor"),
   step: document.querySelector("#steps-editor"),
@@ -40,8 +50,9 @@ function val(input) {
   return input ? input.value.trim() : "";
 }
 
-function mediaUrl(path) {
-  return supabase.storage.from("recipe-media").getPublicUrl(path).data.publicUrl;
+async function signedUrl(path) {
+  const { data } = await supabase.storage.from("recipe-media").createSignedUrl(path, 3600);
+  return data ? data.signedUrl : "";
 }
 
 // ---------- Row-based editors ----------
@@ -143,8 +154,8 @@ function mediaPreviewHtml(items) {
   return items.map(m => `
     <figure class="media-preview" data-path="${escapeHtml(m.path)}">
       ${m.type === "video"
-        ? `<video src="${escapeHtml(mediaUrl(m.path))}" muted preload="metadata"></video>`
-        : `<img src="${escapeHtml(mediaUrl(m.path))}" alt="${escapeHtml(m.alt || "")}" loading="lazy">`}
+        ? `<video src="${escapeHtml(m.signedUrl)}" muted preload="metadata"></video>`
+        : `<img src="${escapeHtml(m.signedUrl)}" alt="${escapeHtml(m.alt || "")}" loading="lazy">`}
       <button type="button" class="remove-media" title="Remove">×</button>
     </figure>`).join("");
 }
@@ -324,15 +335,15 @@ function groupBySection(items) {
 function mediaGallery(items) {
   if (!items || !items.length) return "";
   return `<div class="media-grid">${items.map(m => m.type === "video"
-    ? `<figure class="media-item"><video src="${escapeHtml(mediaUrl(m.path))}" controls preload="metadata"></video></figure>`
-    : `<figure class="media-item"><img src="${escapeHtml(mediaUrl(m.path))}" alt="${escapeHtml(m.alt || "")}" loading="lazy"></figure>`).join("")}</div>`;
+    ? `<figure class="media-item"><video src="${escapeHtml(m.signedUrl)}" controls preload="metadata"></video></figure>`
+    : `<figure class="media-item"><img src="${escapeHtml(m.signedUrl)}" alt="${escapeHtml(m.alt || "")}" loading="lazy"></figure>`).join("")}</div>`;
 }
 
 function mediaInline(items) {
   if (!items || !items.length) return "";
   return `<span class="media-inline">${items.map(m => m.type === "video"
-    ? `<video src="${escapeHtml(mediaUrl(m.path))}" muted preload="metadata" title="${escapeHtml(m.alt || "")}"></video>`
-    : `<img src="${escapeHtml(mediaUrl(m.path))}" alt="${escapeHtml(m.alt || "")}" loading="lazy">`).join("")}</span>`;
+    ? `<video src="${escapeHtml(m.signedUrl)}" muted preload="metadata" title="${escapeHtml(m.alt || "")}"></video>`
+    : `<img src="${escapeHtml(m.signedUrl)}" alt="${escapeHtml(m.alt || "")}" loading="lazy">`).join("")}</span>`;
 }
 
 function ingredientList(items) {
@@ -395,8 +406,16 @@ function render() {
     </li>`).join("");
 }
 
+async function attachSignedUrls(r) {
+  const withUrl = async m => { m.signedUrl = await signedUrl(m.path); };
+  for (const m of r.media || []) await withUrl(m);
+  for (const arr of [r.ingredients, r.steps, r.cookware]) {
+    for (const item of arr || []) for (const m of item.media || []) await withUrl(m);
+  }
+}
+
 async function load() {
-  if (!config) return;
+  if (!config || !isAuthed) return;
   setStatus("Loading…");
   const { data, error } = await supabase
     .from("recipes")
@@ -410,6 +429,7 @@ async function load() {
     cookware: (r.cookware || []).sort((a, b) => a.position - b.position),
     media: (r.media || []).sort((a, b) => a.sort_order - b.sort_order),
   }));
+  for (const r of recipes) await attachSignedUrls(r);
   render();
   setStatus("");
 }
@@ -452,12 +472,55 @@ resetFormBtn.addEventListener("click", () => {
 
 searchInput.addEventListener("input", render);
 
+// ---------- Authentication ----------
+
+function showAuth() {
+  authScreen.classList.remove("hidden");
+  appEl.classList.add("hidden");
+}
+
+function showApp() {
+  authScreen.classList.add("hidden");
+  appEl.classList.remove("hidden");
+}
+
+function applySession(session) {
+  isAuthed = !!session;
+  logoutBtn.classList.toggle("hidden", !session);
+  if (session) {
+    showApp();
+    load();
+  } else {
+    recipes = [];
+    showAuth();
+    render();
+  }
+}
+
+authForm.addEventListener("submit", async e => {
+  e.preventDefault();
+  authError.classList.add("hidden");
+  const { error } = await supabase.auth.signInWithPassword({
+    email: authEmail.value.trim(),
+    password: authPassword.value,
+  });
+  if (error) { authError.textContent = error.message; authError.classList.remove("hidden"); return; }
+  authForm.reset();
+});
+
+logoutBtn.addEventListener("click", async () => {
+  await supabase.auth.signOut();
+});
+
 if (config) {
   supabase = window.supabase.createClient(config.url, config.key);
+  supabase.auth.getSession().then(({ data }) => applySession(data.session));
+  supabase.auth.onAuthStateChange((_event, session) => applySession(session));
 } else {
   banner.classList.remove("hidden");
+  showApp();
+  render();
 }
 
 seedEmptyRows();
 load();
-render();

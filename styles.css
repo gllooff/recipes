@@ -30,6 +30,40 @@ body {
 
 header { margin-bottom: 2rem; }
 
+.logout { margin-top: .7rem; }
+
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.8rem 1.6rem;
+}
+
+.auth-card h1 { font-size: 1.6rem; }
+
+.auth-form { display: flex; flex-direction: column; gap: 1rem; margin-top: 1.2rem; }
+
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  font-size: .9rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.auth-form button { align-self: flex-start; }
+
 .eyebrow {
   margin: 0 0 .35rem;
   text-transform: uppercase;

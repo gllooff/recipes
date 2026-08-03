@@ -19,12 +19,12 @@ Then open http://localhost:8000.
 1. Create a free account at https://supabase.com and start a new project.
 2. In the Supabase dashboard, open **SQL Editor** and run the contents of
    `sql/schema.sql`. This creates five tables — `recipes`, `ingredients`,
-   `steps`, `cookware`, and `media` — with row-level security that lets the
-   public site read, add, edit, and delete rows. Ingredients, steps, and
-   cookware are ordered, optionally grouped into sections, and can each hold
-   their own photos/videos via the `media` table. It also creates a public
-   `recipe-media` Storage bucket where the image and video files are uploaded
-   (with matching RLS policies for it).
+   `steps`, `cookware`, and `media`. Ingredients, steps, and cookware are
+   ordered, optionally grouped into sections, and can each hold their own
+   photos/videos via the `media` table. It also creates a private
+   `recipe-media` Storage bucket for the files (served through signed URLs).
+   > If the project was set up with the older, open `anon` policies, run
+   > `sql/migrate_auth.sql` instead — it removes the anonymous access.
 3. Open **Project Settings -> API** and copy the **Project URL** and the
    **anon public key**.
 4. Put both values into `config.js`:
@@ -36,6 +36,19 @@ Then open http://localhost:8000.
 > The anon key is meant to be public — it is only usable against the policies
 > you define. Row-level security is what keeps the data safe, so do not weaken
 > the policies in `schema.sql`.
+
+## Authentication
+
+The site is private. Nobody can read or write anything without signing in.
+
+1. In the Supabase dashboard go to **Authentication -> Providers -> Email**
+   and turn **off** "Allow new users to sign up" (so nobody can create their
+   own account).
+2. Under **Authentication -> Users** click **Add user** and create your own
+   account (email + password). You may also want to turn off "Confirm email"
+   in **Providers -> Email** so you can sign in immediately.
+3. Open the site and sign in with those credentials. The session persists
+   until you sign out.
 
 ## Deploying
 

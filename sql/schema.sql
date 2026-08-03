@@ -72,59 +72,80 @@ create index if not exists media_ingredient_idx on public.media (ingredient_id);
 create index if not exists media_step_idx on public.media (step_id);
 create index if not exists media_cookware_idx on public.media (cookware_id);
 
--- Row-level security: the public (anon) site may read and write everything.
+-- Row-level security: only signed-in users may read and write.
+-- For an existing project, run sql/migrate_auth.sql instead (it removes the
+-- old anon policies). For a fresh setup, run this whole file.
 alter table public.recipes enable row level security;
 alter table public.ingredients enable row level security;
 alter table public.steps enable row level security;
 alter table public.cookware enable row level security;
 alter table public.media enable row level security;
 
-create policy "anon can read recipes" on public.recipes
-  for select to anon using (true);
-create policy "anon can insert recipes" on public.recipes
-  for insert to anon with check (true);
-create policy "anon can update recipes" on public.recipes
-  for update to anon using (true) with check (true);
-create policy "anon can delete recipes" on public.recipes
-  for delete to anon using (true);
+drop policy if exists "authenticated can read recipes" on public.recipes;
+drop policy if exists "authenticated can insert recipes" on public.recipes;
+drop policy if exists "authenticated can update recipes" on public.recipes;
+drop policy if exists "authenticated can delete recipes" on public.recipes;
+drop policy if exists "authenticated can read ingredients" on public.ingredients;
+drop policy if exists "authenticated can insert ingredients" on public.ingredients;
+drop policy if exists "authenticated can delete ingredients" on public.ingredients;
+drop policy if exists "authenticated can read steps" on public.steps;
+drop policy if exists "authenticated can insert steps" on public.steps;
+drop policy if exists "authenticated can delete steps" on public.steps;
+drop policy if exists "authenticated can read cookware" on public.cookware;
+drop policy if exists "authenticated can insert cookware" on public.cookware;
+drop policy if exists "authenticated can delete cookware" on public.cookware;
+drop policy if exists "authenticated can read media" on public.media;
+drop policy if exists "authenticated can insert media" on public.media;
+drop policy if exists "authenticated can delete media" on public.media;
 
-create policy "anon can read ingredients" on public.ingredients
-  for select to anon using (true);
-create policy "anon can insert ingredients" on public.ingredients
-  for insert to anon with check (true);
-create policy "anon can delete ingredients" on public.ingredients
-  for delete to anon using (true);
+create policy "authenticated can read recipes" on public.recipes
+  for select to authenticated using (true);
+create policy "authenticated can insert recipes" on public.recipes
+  for insert to authenticated with check (true);
+create policy "authenticated can update recipes" on public.recipes
+  for update to authenticated using (true) with check (true);
+create policy "authenticated can delete recipes" on public.recipes
+  for delete to authenticated using (true);
 
-create policy "anon can read steps" on public.steps
-  for select to anon using (true);
-create policy "anon can insert steps" on public.steps
-  for insert to anon with check (true);
-create policy "anon can delete steps" on public.steps
-  for delete to anon using (true);
+create policy "authenticated can read ingredients" on public.ingredients
+  for select to authenticated using (true);
+create policy "authenticated can insert ingredients" on public.ingredients
+  for insert to authenticated with check (true);
+create policy "authenticated can delete ingredients" on public.ingredients
+  for delete to authenticated using (true);
 
-create policy "anon can read cookware" on public.cookware
-  for select to anon using (true);
-create policy "anon can insert cookware" on public.cookware
-  for insert to anon with check (true);
-create policy "anon can delete cookware" on public.cookware
-  for delete to anon using (true);
+create policy "authenticated can read steps" on public.steps
+  for select to authenticated using (true);
+create policy "authenticated can insert steps" on public.steps
+  for insert to authenticated with check (true);
+create policy "authenticated can delete steps" on public.steps
+  for delete to authenticated using (true);
 
-create policy "anon can read media" on public.media
-  for select to anon using (true);
-create policy "anon can insert media" on public.media
-  for insert to anon with check (true);
-create policy "anon can delete media" on public.media
-  for delete to anon using (true);
+create policy "authenticated can read cookware" on public.cookware
+  for select to authenticated using (true);
+create policy "authenticated can insert cookware" on public.cookware
+  for insert to authenticated with check (true);
+create policy "authenticated can delete cookware" on public.cookware
+  for delete to authenticated using (true);
 
--- Public bucket for the image and video files.
-insert into storage.buckets (id, name, public) values ('recipe-media', 'recipe-media', true)
+create policy "authenticated can read media" on public.media
+  for select to authenticated using (true);
+create policy "authenticated can insert media" on public.media
+  for insert to authenticated with check (true);
+create policy "authenticated can delete media" on public.media
+  for delete to authenticated using (true);
+
+-- Private bucket for the image and video files, served through signed URLs.
+insert into storage.buckets (id, name, public) values ('recipe-media', 'recipe-media', false)
   on conflict (id) do nothing;
 
-create policy "anon can read media files" on storage.objects
-  for select to anon using (bucket_id = 'recipe-media');
+drop policy if exists "authenticated can read media files" on storage.objects;
+drop policy if exists "authenticated can upload media files" on storage.objects;
+drop policy if exists "authenticated can delete media files" on storage.objects;
 
-create policy "anon can upload media files" on storage.objects
-  for insert to anon with check (bucket_id = 'recipe-media');
-
-create policy "anon can delete media files" on storage.objects
-  for delete to anon using (bucket_id = 'recipe-media');
+create policy "authenticated can read media files" on storage.objects
+  for select to authenticated using (bucket_id = 'recipe-media');
+create policy "authenticated can upload media files" on storage.objects
+  for insert to authenticated with check (bucket_id = 'recipe-media');
+create policy "authenticated can delete media files" on storage.objects
+  for delete to authenticated using (bucket_id = 'recipe-media');
