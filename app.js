@@ -10,6 +10,8 @@ const countEl = document.querySelector("#count");
 const emptyEl = document.querySelector("#empty");
 const statusEl = document.querySelector("#status");
 const banner = document.querySelector("#config-banner");
+const pageSizeSelect = document.querySelector("#page-size");
+const paginationEl = document.querySelector("#pagination");
 
 const appEl = document.querySelector("#app");
 const authScreen = document.querySelector("#auth-screen");
@@ -30,6 +32,8 @@ const recipeMediaInput = document.querySelector("#recipe-media");
 const recipeMediaPreview = document.querySelector("#recipe-media-preview");
 
 let recipes = [];
+let pageSize = 5;
+let currentPage = 1;
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -375,14 +379,44 @@ function matches(r, q) {
   return haystack.join(" ").toLowerCase().includes(q);
 }
 
+function renderPagination(totalPages) {
+  const pageBtn = n => `<button type="button" class="page-btn${n === currentPage ? " active" : ""}" data-page="${n}"${n === currentPage ? ' aria-current="page"' : ""}>${n}</button>`;
+  const ellipsis = '<span class="page-ellipsis">…</span>';
+  const buttons = [
+    `<button type="button" class="page-btn nav" data-page="${currentPage - 1}"${currentPage <= 1 ? " disabled" : ""}>Prev</button>`,
+  ];
+  const windowStart = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
+  const windowEnd = Math.min(totalPages, windowStart + 4);
+  if (windowStart > 1) {
+    buttons.push(pageBtn(1));
+    if (windowStart > 2) buttons.push(ellipsis);
+  }
+  for (let i = windowStart; i <= windowEnd; i++) buttons.push(pageBtn(i));
+  if (windowEnd < totalPages) {
+    if (windowEnd < totalPages - 1) buttons.push(ellipsis);
+    buttons.push(pageBtn(totalPages));
+  }
+  buttons.push(
+    `<button type="button" class="page-btn nav" data-page="${currentPage + 1}"${currentPage >= totalPages ? " disabled" : ""}>Next</button>`,
+  );
+  paginationEl.innerHTML = buttons.join("");
+}
+
 function render() {
   const q = searchInput.value.trim().toLowerCase();
   const shown = q ? recipes.filter(r => matches(r, q)) : recipes;
+  const totalPages = Math.max(1, Math.ceil(shown.length / pageSize));
+  currentPage = Math.min(currentPage, totalPages);
+  const start = (currentPage - 1) * pageSize;
+  const page = shown.slice(start, start + pageSize);
 
-  countEl.textContent = `${shown.length} of ${recipes.length} recipe${recipes.length === 1 ? "" : "s"}`;
+  countEl.textContent = shown.length
+    ? `Showing ${start + 1}–${start + page.length} of ${shown.length} recipe${shown.length === 1 ? "" : "s"}`
+    : "No recipes";
   emptyEl.classList.toggle("hidden", shown.length > 0);
+  paginationEl.classList.toggle("hidden", totalPages <= 1);
 
-  list.innerHTML = shown.map(r => `
+  list.innerHTML = page.map(r => `
     <li class="recipe" data-id="${r.id}">
       <h3>${escapeHtml(r.title)}</h3>
       <p class="meta">Added ${formatDate(r.created_at)}</p>
@@ -396,6 +430,8 @@ function render() {
         <button type="button" class="delete" data-id="${r.id}">Delete</button>
       </div>
     </li>`).join("");
+
+  renderPagination(totalPages);
 }
 
 async function attachSignedUrls(r) {
@@ -462,6 +498,20 @@ resetFormBtn.addEventListener("click", () => {
 });
 
 searchInput.addEventListener("input", render);
+
+pageSizeSelect.addEventListener("change", () => {
+  pageSize = parseInt(pageSizeSelect.value, 10);
+  currentPage = 1;
+  render();
+});
+
+paginationEl.addEventListener("click", e => {
+  const btn = e.target.closest("button[data-page]");
+  if (!btn || btn.disabled) return;
+  currentPage = parseInt(btn.dataset.page, 10);
+  render();
+  list.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 // ---------- Authentication ----------
 
