@@ -92,11 +92,6 @@ function addRow(kind) {
   editors[kind].insertAdjacentHTML("beforeend", rowTemplate(kind));
 }
 
-function seedEmptyRows() {
-  addRow("ingredient");
-  addRow("step");
-}
-
 Object.entries(editors).forEach(([kind, editor]) => {
   editor.addEventListener("click", e => {
     const btn = e.target.closest("button");
@@ -312,7 +307,6 @@ form.addEventListener("submit", async e => {
   if (removed.length) await supabase.storage.from("recipe-media").remove(removed);
 
   resetForm();
-  seedEmptyRows();
   setStatus(editingId ? "Recipe updated." : "Recipe saved.");
   await load();
 });
@@ -464,7 +458,6 @@ list.addEventListener("click", async e => {
 
 resetFormBtn.addEventListener("click", () => {
   resetForm();
-  seedEmptyRows();
   setStatus("");
 });
 
@@ -520,5 +513,4 @@ if (config) {
   render();
 }
 
-seedEmptyRows();
 load();
