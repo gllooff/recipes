@@ -259,8 +259,6 @@ form.addEventListener("submit", async e => {
   const ingredientRows = readRows("ingredient");
   const stepRows = readRows("step");
   const cookwareRows = readRows("cookware");
-  if (!ingredientRows.length) { setStatus("Add at least one ingredient.", true); return; }
-  if (!stepRows.length) { setStatus("Add at least one step.", true); return; }
   for (const r of ingredientRows) if (!r.amount || !r.name) { setStatus("Each ingredient needs an amount and a name.", true); return; }
   for (const r of stepRows) if (!r.text) { setStatus("Every step needs instructions.", true); return; }
   for (const r of cookwareRows) if (!r.name) { setStatus("Every cookware item needs a name.", true); return; }
