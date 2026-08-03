@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recipe Book</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header>
+      <p class="eyebrow">Personal cookbook</p>
+      <h1>Recipe book</h1>
+      <p class="subtitle">Record and browse your favourite dishes.</p>
+    </header>
+
+    <section id="config-banner" class="config-banner hidden" aria-live="polite">
+      Not connected to a database. Put your Supabase URL and anon key in <code>config.js</code>.
+    </section>
+
+    <section class="controls" aria-label="Add a recipe">
+      <h2>Add a recipe</h2>
+      <form id="recipe-form" class="recipe-form">
+        <label>Title <input id="title" name="title" type="text" required placeholder="e.g. Butter chicken" autocomplete="off"></label>
+        <label>Notes <textarea id="notes" name="notes" rows="2" placeholder="Optional"></textarea></label>
+
+        <div class="form-group">
+          <h3>Ingredients</h3>
+          <div id="ingredients-editor" data-kind="ingredient"></div>
+          <button type="button" class="secondary add-row" data-kind="ingredient">+ Add ingredient</button>
+        </div>
+
+        <div class="form-group">
+          <h3>Steps</h3>
+          <div id="steps-editor" data-kind="step"></div>
+          <button type="button" class="secondary add-row" data-kind="step">+ Add step</button>
+        </div>
+
+        <div class="form-group">
+          <h3>Cookware</h3>
+          <div id="cookware-editor" data-kind="cookware"></div>
+          <button type="button" class="secondary add-row" data-kind="cookware">+ Add cookware</button>
+        </div>
+
+        <div class="form-group">
+          <h3>Recipe photos &amp; videos</h3>
+          <div id="recipe-media-preview" class="media-previews"></div>
+          <label class="file-label">Add files
+            <input id="recipe-media" type="file" accept="image/*,video/*" multiple>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="submit">Save recipe</button>
+          <button type="button" id="reset-form">Clear</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="recipes" aria-label="Saved recipes">
+      <div class="recipes-header">
+        <h2>Saved recipes</h2>
+        <input id="search" type="search" placeholder="Search recipes…" autocomplete="off" aria-label="Search recipes">
+      </div>
+      <p id="count" class="count" aria-live="polite"></p>
+      <ul id="recipe-list" class="recipe-list"></ul>
+      <p id="empty" class="empty hidden">No recipes yet. Add your first one above.</p>
+      <p id="status" class="status" role="status"></p>
+    </section>
+  </main>
+  <script src="config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
