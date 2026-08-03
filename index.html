@@ -33,6 +33,17 @@
       Not connected to a database. Put your Supabase URL and anon key in <code>config.js</code>.
     </section>
 
+    <section class="recipes" aria-label="Saved recipes">
+      <div class="recipes-header">
+        <h2>Saved recipes</h2>
+        <input id="search" type="search" placeholder="Search recipes…" autocomplete="off" aria-label="Search recipes">
+      </div>
+      <p id="count" class="count" aria-live="polite"></p>
+      <ul id="recipe-list" class="recipe-list"></ul>
+      <p id="empty" class="empty hidden">No recipes yet. Add your first one above.</p>
+      <p id="status" class="status" role="status"></p>
+    </section>
+
     <section class="controls" aria-label="Add a recipe">
       <h2>Add a recipe</h2>
       <form id="recipe-form" class="recipe-form">
@@ -70,17 +81,6 @@
           <button type="button" id="reset-form">Clear</button>
         </div>
       </form>
-    </section>
-
-    <section class="recipes" aria-label="Saved recipes">
-      <div class="recipes-header">
-        <h2>Saved recipes</h2>
-        <input id="search" type="search" placeholder="Search recipes…" autocomplete="off" aria-label="Search recipes">
-      </div>
-      <p id="count" class="count" aria-live="polite"></p>
-      <ul id="recipe-list" class="recipe-list"></ul>
-      <p id="empty" class="empty hidden">No recipes yet. Add your first one above.</p>
-      <p id="status" class="status" role="status"></p>
     </section>
   </main>
   <script src="config.js"></script>
