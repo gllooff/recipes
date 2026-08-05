@@ -12,15 +12,22 @@ cross join lateral jsonb_array_elements_text(r.meta_info -> 'tags') as elem
 where jsonb_typeof(r.meta_info -> 'tags') = 'array'
 on conflict (name) do nothing;
 
--- 2. Rewrite each recipe's meta_info -> 'tags' to registry ids.
+-- 2. Rewrite each recipe's meta_info -> 'tags' to registry ids. Already-converted
+--    ids are left untouched, so this script is safe to run more than once.
 update public.recipes r
 set meta_info = jsonb_set(
   r.meta_info,
   '{tags}',
   (
-    select coalesce(jsonb_agg(t.id::text), '[]'::jsonb)
-    from jsonb_array_elements_text(r.meta_info -> 'tags') as elem
-    join public.tags t on t.name = elem
+    select coalesce(jsonb_agg(elem), '[]'::jsonb)
+    from (
+      select case
+        when t.id is not null then t.id::text
+        else elem
+      end as elem
+      from jsonb_array_elements_text(r.meta_info -> 'tags') as elem
+      left join public.tags t on t.name = elem or t.id::text = elem
+    ) s
   )
 )
 where jsonb_typeof(r.meta_info -> 'tags') = 'array';

@@ -234,7 +234,8 @@ async function loadTagNames() {
 function renderTagChips(container, tags, onRemove) {
   container.innerHTML = tags.map(t => {
     const id = String(t);
-    const name = tagNames.get(id) || id;
+    const name = tagNames.get(id);
+    if (!name) return "";
     return `
     <span class="tag-chip">${escapeHtml(name)}
       <button type="button" class="tag-remove" data-tag="${escapeHtml(id)}" title="Remove tag">×</button>
@@ -481,12 +482,11 @@ function renderPagination(totalPages) {
 
 function tagListFor(r) {
   const tags = Array.isArray(r.meta_info?.tags) ? r.meta_info.tags : [];
-  if (!tags.length) return "";
   const chips = tags.map(t => {
-    const name = tagNames.get(String(t)) || String(t);
-    return `<span class="tag-chip static">${escapeHtml(name)}</span>`;
+    const name = tagNames.get(String(t));
+    return name ? `<span class="tag-chip static">${escapeHtml(name)}</span>` : "";
   }).join("");
-  return `<p class="tag-list">${chips}</p>`;
+  return chips ? `<p class="tag-list">${chips}</p>` : "";
 }
 
 function render() {
@@ -716,6 +716,10 @@ async function loadTagPicker() {
         <input type="checkbox" data-tag="${escapeHtml(String(t.id))}"${tagPickerSelection.has(String(t.id)) ? " checked" : ""}>
         <span class="tag-name">${escapeHtml(t.name)}</span>
         <span class="tag-count">${t.recipe_count} recipe${t.recipe_count === 1 ? "" : "s"}</span>
+        <span class="tag-actions">
+          <button type="button" class="tag-edit" data-tag-id="${escapeHtml(String(t.id))}" data-tag-name="${escapeHtml(t.name)}" title="Rename tag" aria-label="Rename tag">✎</button>
+          <button type="button" class="tag-delete" data-tag-id="${escapeHtml(String(t.id))}" data-tag-name="${escapeHtml(t.name)}" title="Delete tag" aria-label="Delete tag">✕</button>
+        </span>
       </label>
     </li>`).join("");
   renderTagPickerPagination(totalPages);
@@ -825,13 +829,62 @@ tagPickerSearch.addEventListener("input", () => {
 });
 tagPickerList.addEventListener("click", e => {
   const box = e.target.closest("input[type=checkbox]");
-  if (!box) return;
-  const tag = box.dataset.tag;
-  if (box.checked) tagPickerSelection.add(tag);
-  else tagPickerSelection.delete(tag);
-  renderTagPickerSelected();
-  updateTagPickerCreate();
+  if (box) {
+    const tag = box.dataset.tag;
+    if (box.checked) tagPickerSelection.add(tag);
+    else tagPickerSelection.delete(tag);
+    renderTagPickerSelected();
+    updateTagPickerCreate();
+    return;
+  }
+  const editBtn = e.target.closest("button.tag-edit");
+  if (editBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    renameTag(editBtn.dataset.tagId, editBtn.dataset.tagName);
+    return;
+  }
+  const delBtn = e.target.closest("button.tag-delete");
+  if (delBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    deleteTag(delBtn.dataset.tagId, delBtn.dataset.tagName);
+  }
 });
+
+async function renameTag(id, oldName) {
+  const input = prompt("Rename tag", oldName);
+  if (input === null) return;
+  const name = normalizeTag(input);
+  if (!name) { setStatus("Tag name cannot be empty.", true); return; }
+  if (name === oldName) return;
+  const { data: existing } = await supabase.from("tags").select("id").eq("name", name).maybeSingle();
+  if (existing) { setStatus("A tag with that name already exists.", true); return; }
+  const { error } = await supabase.from("tags").update({ name }).eq("id", id);
+  if (error) { setStatus("Failed to rename tag: " + error.message, true); return; }
+  tagNames.set(String(id), name);
+  loadTagPicker();
+  await load();
+  setStatus("Tag renamed.");
+}
+
+async function deleteTag(id, name) {
+  if (!confirm(`Delete tag "${name}"? It will no longer be shown on recipes.`)) return;
+  setStatus("Deleting tag…");
+  const { error } = await supabase.from("tags").delete().eq("id", id);
+  if (error) { setStatus("Failed to delete tag: " + error.message, true); return; }
+  tagNames.delete(String(id));
+  tagPickerSelection.delete(String(id));
+  formTags = formTags.filter(t => String(t) !== String(id));
+  tagFilter = tagFilter.filter(t => String(t) !== String(id));
+  syncTagPickerBoxes();
+  renderTagPickerSelected();
+  renderFormTagChips();
+  renderTagFilterChips();
+  loadTagPicker();
+  await load();
+  setStatus("Tag deleted.");
+}
 tagPickerPagination.addEventListener("click", e => {
   const btn = e.target.closest("button[data-page]");
   if (!btn || btn.disabled) return;

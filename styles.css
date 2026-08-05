@@ -502,6 +502,28 @@ button.danger:hover { border-color: var(--danger); }
 .tag-picker-item .tag-name { flex: 1; }
 .tag-picker-item .tag-count { color: var(--muted); font-size: .78rem; }
 
+.tag-picker-item .tag-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: .15rem;
+}
+
+.tag-picker-item button.tag-edit,
+.tag-picker-item button.tag-delete {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: .1rem .3rem;
+  font-size: .8rem;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.tag-picker-item button.tag-edit:hover { color: var(--foreground); border-color: var(--border); }
+.tag-picker-item button.tag-delete { color: var(--danger); }
+.tag-picker-item button.tag-delete:hover { border-color: var(--danger); }
+
 .hidden { display: none !important; }
 
 .back-to-top {
