@@ -30,7 +30,12 @@ body {
 
 header { margin-bottom: 2rem; }
 
-.logout { margin-top: .7rem; }
+.header-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: .6rem;
+  margin-top: .7rem;
+}
 
 .auth-screen {
   min-height: 100vh;

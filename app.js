@@ -12,6 +12,7 @@ const statusEl = document.querySelector("#status");
 const banner = document.querySelector("#config-banner");
 const pageSizeSelect = document.querySelector("#page-size");
 const paginationEl = document.querySelector("#pagination");
+const refreshBtn = document.querySelector("#refresh");
 
 const appEl = document.querySelector("#app");
 const authScreen = document.querySelector("#auth-screen");
@@ -542,6 +543,7 @@ function showApp() {
 function applySession(session) {
   isAuthed = !!session;
   logoutBtn.classList.toggle("hidden", !session);
+  refreshBtn.classList.toggle("hidden", !session);
   if (session) {
     showApp();
     load();
@@ -566,6 +568,8 @@ authForm.addEventListener("submit", async e => {
 logoutBtn.addEventListener("click", async () => {
   await supabase.auth.signOut();
 });
+
+refreshBtn.addEventListener("click", () => load());
 
 if (config) {
   supabase = window.supabase.createClient(config.url, config.key);
