@@ -286,12 +286,68 @@ function mediaInfoFor(r) {
   return map;
 }
 
+const MAX_IMAGE_BYTES = 200 * 1024;
+const TARGET_IMAGE_BYTES = 100 * 1024;
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not read image.")); };
+    img.src = url;
+  });
+}
+
+function canvasToJpegBlob(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(b => (b ? resolve(b) : reject(new Error("Could not encode image."))), "image/jpeg", quality);
+  });
+}
+
+async function bestJpegBlob(canvas, byteLimit) {
+  let lo = 0.05, hi = 1, best = null, smallest = null;
+  for (let i = 0; i < 8; i++) {
+    const mid = (lo + hi) / 2;
+    const blob = await canvasToJpegBlob(canvas, mid);
+    if (!smallest || blob.size < smallest.size) smallest = blob;
+    if (blob.size <= byteLimit) { best = blob; lo = mid; }
+    else hi = mid;
+  }
+  return best || smallest;
+}
+
+async function compressImage(file) {
+  if (/^image\/jpeg$/i.test(file.type) && file.size <= MAX_IMAGE_BYTES) return file;
+  const img = await loadImage(file);
+  const draw = (w, h) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+    return canvas;
+  };
+  let width = img.naturalWidth;
+  let height = img.naturalHeight;
+  let blob = await bestJpegBlob(draw(width, height), TARGET_IMAGE_BYTES);
+  let guard = 0;
+  while (blob.size > MAX_IMAGE_BYTES && guard++ < 6) {
+    const scale = Math.sqrt(TARGET_IMAGE_BYTES / blob.size);
+    width = Math.max(1, Math.round(width * scale));
+    height = Math.max(1, Math.round(height * scale));
+    blob = await bestJpegBlob(draw(width, height), TARGET_IMAGE_BYTES);
+  }
+  const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+  return new File([blob], name, { type: "image/jpeg" });
+}
+
 async function uploadFile(file) {
   const isVideo = file.type.startsWith("video/");
   if (!isVideo && !file.type.startsWith("image/")) return null;
-  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  const fileToUpload = isVideo ? file : await compressImage(file).catch(() => file);
+  const ext = fileToUpload.type === "image/jpeg" ? "jpg" : (file.name.split(".").pop() || "").toLowerCase();
   const path = `${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from("recipe-media").upload(path, file);
+  const { error } = await supabase.storage.from("recipe-media").upload(path, fileToUpload);
   if (error) { setStatus(`Failed to upload ${file.name}: ${error.message}`, true); return null; }
   return { path, type: isVideo ? "video" : "image", alt: file.name };
 }
