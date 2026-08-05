@@ -172,6 +172,7 @@ function populateForm(r) {
   recipeMediaPreview.innerHTML = mediaPreviewHtml(r.media || []);
   form.dataset.editingId = r.id;
   form.querySelector("button[type=submit]").textContent = "Update recipe";
+  resetFormBtn.textContent = "Cancel";
 }
 
 function resetForm() {
@@ -180,6 +181,7 @@ function resetForm() {
   ["ingredient", "step", "cookware"].forEach(k => { editors[k].innerHTML = ""; });
   recipeMediaPreview.innerHTML = "";
   form.querySelector("button[type=submit]").textContent = "Save recipe";
+  resetFormBtn.textContent = "Clear";
 }
 
 // ---------- Saving ----------
