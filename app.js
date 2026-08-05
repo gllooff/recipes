@@ -503,7 +503,7 @@ resetFormBtn.addEventListener("click", () => {
 searchInput.addEventListener("input", render);
 
 pageSizeSelect.addEventListener("change", () => {
-  pageSize = parseInt(pageSizeSelect.value, 10);
+  pageSize = pageSizeSelect.value === "0" ? Number.MAX_SAFE_INTEGER : parseInt(pageSizeSelect.value, 10);
   currentPage = 1;
   render();
 });
