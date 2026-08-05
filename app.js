@@ -62,6 +62,8 @@ let tagPickerPage = 1;
 let tagPickerTotal = 0;
 let tagPickerSearchTimer = null;
 let tagPickerMode = "filter";
+let tagPickerRecipeId = null;
+let tagNames = new Map();
 const TAG_PICKER_PAGE_SIZE = 20;
 
 function setStatus(message, isError = false) {
@@ -195,7 +197,7 @@ function populateEditor(kind, rows) {
 function populateForm(r) {
   form.title.value = r.title;
   form.notes.value = r.notes || "";
-  formTags = Array.isArray(r.meta_info?.tags) ? r.meta_info.tags.map(t => String(t).toLowerCase()) : [];
+  formTags = Array.isArray(r.meta_info?.tags) ? r.meta_info.tags.map(t => String(t)) : [];
   renderFormTagChips();
   populateEditor("ingredient", r.ingredients);
   populateEditor("step", r.steps);
@@ -223,11 +225,21 @@ function normalizeTag(s) {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+async function loadTagNames() {
+  if (!config || !isAuthed) return;
+  const { data, error } = await supabase.from("tags").select("id, name");
+  if (!error) tagNames = new Map((data || []).map(t => [String(t.id), t.name]));
+}
+
 function renderTagChips(container, tags, onRemove) {
-  container.innerHTML = tags.map(t => `
-    <span class="tag-chip">${escapeHtml(t)}
-      <button type="button" class="tag-remove" data-tag="${escapeHtml(t)}" title="Remove tag">×</button>
-    </span>`).join("");
+  container.innerHTML = tags.map(t => {
+    const id = String(t);
+    const name = tagNames.get(id) || id;
+    return `
+    <span class="tag-chip">${escapeHtml(name)}
+      <button type="button" class="tag-remove" data-tag="${escapeHtml(id)}" title="Remove tag">×</button>
+    </span>`;
+  }).join("");
   container.querySelectorAll(".tag-remove").forEach(btn => {
     btn.addEventListener("click", () => onRemove(btn.dataset.tag));
   });
@@ -352,11 +364,6 @@ form.addEventListener("submit", async e => {
     recipeId = data[0].id;
   }
 
-  if (tags.length) {
-    const { error } = await supabase.from("tags").upsert(tags.map(name => ({ name })), { onConflict: "name", ignoreDuplicates: true });
-    if (error) setStatus("Failed to save tags: " + error.message, true);
-  }
-
   if (editingId) {
     await supabase.from("media").delete().eq("recipe_id", recipeId);
     await supabase.from("ingredients").delete().eq("recipe_id", recipeId);
@@ -475,7 +482,11 @@ function renderPagination(totalPages) {
 function tagListFor(r) {
   const tags = Array.isArray(r.meta_info?.tags) ? r.meta_info.tags : [];
   if (!tags.length) return "";
-  return `<p class="tag-list">${tags.map(t => `<span class="tag-chip static">${escapeHtml(t)}</span>`).join("")}</p>`;
+  const chips = tags.map(t => {
+    const name = tagNames.get(String(t)) || String(t);
+    return `<span class="tag-chip static">${escapeHtml(name)}</span>`;
+  }).join("");
+  return `<p class="tag-list">${chips}</p>`;
 }
 
 function render() {
@@ -502,8 +513,11 @@ function render() {
       ${r.notes ? `<p class="notes">${escapeHtml(r.notes)}</p>` : ""}
       <div class="actions">
         <button type="button" class="secondary edit" data-id="${r.id}">Edit</button>
+        <button type="button" class="secondary add-tags" data-id="${r.id}">Add tags</button>
+        <button type="button" class="secondary add-images" data-id="${r.id}">Add images</button>
         <button type="button" class="delete" data-id="${r.id}">Delete</button>
       </div>
+      <input type="file" class="recipe-image-input" data-id="${r.id}" accept="image/*" multiple hidden>
     </li>`).join("");
 
   renderPagination(totalPages);
@@ -532,6 +546,7 @@ async function load({ goToFirst = false } = {}) {
   if (goToFirst) currentPage = 1;
   const seq = ++loadSeq;
   setStatus("Loading…");
+  await loadTagNames();
   const q = searchInput.value.trim();
   const start = (currentPage - 1) * pageSize;
 
@@ -574,6 +589,16 @@ list.addEventListener("click", async e => {
   if (!id) return;
   const r = recipes.find(x => x.id === id);
 
+  if (btn.classList.contains("add-tags")) {
+    if (r) openTagPicker("recipe", r);
+    return;
+  }
+
+  if (btn.classList.contains("add-images")) {
+    btn.closest("li").querySelector(".recipe-image-input").click();
+    return;
+  }
+
   if (btn.classList.contains("delete")) {
     if (!r || !confirm("Delete this recipe and all its media?")) return;
     setStatus("Deleting…");
@@ -598,6 +623,26 @@ list.addEventListener("click", async e => {
 resetFormBtn.addEventListener("click", () => {
   resetForm();
   setStatus("");
+});
+
+list.addEventListener("change", async e => {
+  const input = e.target.closest(".recipe-image-input");
+  if (!input || !input.files.length) return;
+  const id = input.dataset.id;
+  if (!id) return;
+  const files = Array.from(input.files);
+  input.value = "";
+  const r = recipes.find(x => x.id === id);
+  let sort = (r?.media || []).reduce((m, x) => Math.max(m, x.sort_order ?? 0), -1) + 1;
+  setStatus("Uploading…");
+  for (const file of files) {
+    const up = await uploadFile(file);
+    if (!up) continue;
+    const { error } = await supabase.from("media").insert({ recipe_id: id, type: up.type, path: up.path, alt: up.alt, sort_order: sort++ });
+    if (error) { setStatus("Failed to add image: " + error.message, true); continue; }
+  }
+  await load();
+  setStatus("Images added.");
 });
 
 searchInput.addEventListener("input", () => {
@@ -668,7 +713,7 @@ async function loadTagPicker() {
   tagPickerList.innerHTML = (data || []).map(t => `
     <li>
       <label class="tag-picker-item">
-        <input type="checkbox" data-tag="${escapeHtml(t.name)}"${tagPickerSelection.has(t.name) ? " checked" : ""}>
+        <input type="checkbox" data-tag="${escapeHtml(String(t.id))}"${tagPickerSelection.has(String(t.id)) ? " checked" : ""}>
         <span class="tag-name">${escapeHtml(t.name)}</span>
         <span class="tag-count">${t.recipe_count} recipe${t.recipe_count === 1 ? "" : "s"}</span>
       </label>
@@ -696,18 +741,23 @@ function syncTagPickerBoxes() {
 function updateTagPickerCreate(names) {
   const term = normalizeTag(tagPickerTerm);
   const exactMatch = (names || []).some(n => n === term);
-  const show = !!term && !exactMatch && !tagPickerSelection.has(term);
+  const selectedNames = [...tagPickerSelection].map(id => tagNames.get(String(id)) || "");
+  const show = !!term && !exactMatch && !selectedNames.includes(term);
   tagPickerCreate.classList.toggle("hidden", !show);
   if (show) tagPickerCreate.textContent = `+ Create tag “${tagPickerTerm.trim()}”`;
 }
 
-function openTagPicker(mode) {
+function openTagPicker(mode, recipe = null) {
   tagPickerMode = mode;
-  tagPickerSelection = new Set(mode === "form" ? formTags : tagFilter);
+  tagPickerRecipeId = recipe ? recipe.id : null;
+  const initial = mode === "form" ? formTags
+    : mode === "recipe" ? (Array.isArray(recipe?.meta_info?.tags) ? recipe.meta_info.tags.map(t => String(t)) : [])
+    : tagFilter;
+  tagPickerSelection = new Set(initial);
   tagPickerTerm = "";
   tagPickerPage = 1;
   tagPickerSearch.value = "";
-  tagPickerTitle.textContent = mode === "form" ? "Add tags" : "Filter by tags";
+  tagPickerTitle.textContent = mode === "form" ? "Add tags" : mode === "recipe" ? "Manage tags" : "Filter by tags";
   renderTagPickerSelected();
   tagPicker.classList.remove("hidden");
   tagPickerSearch.focus();
@@ -723,11 +773,21 @@ tagPicker.addEventListener("click", e => {
 window.addEventListener("keydown", e => {
   if (e.key === "Escape") tagPicker.classList.add("hidden");
 });
-tagPickerApply.addEventListener("click", () => {
+tagPickerApply.addEventListener("click", async () => {
   const selected = [...tagPickerSelection].sort();
   if (tagPickerMode === "form") {
     formTags = selected;
     renderFormTagChips();
+  } else if (tagPickerMode === "recipe") {
+    const current = recipes.find(x => x.id === tagPickerRecipeId);
+    const { error } = await supabase.from("recipes")
+      .update({ meta_info: { ...(current?.meta_info || {}), tags: selected } })
+      .eq("id", tagPickerRecipeId);
+    tagPicker.classList.add("hidden");
+    if (error) { setStatus("Failed to save tags: " + error.message, true); return; }
+    await load();
+    setStatus("Tags saved.");
+    return;
   } else {
     tagFilter = selected;
     renderTagFilterChips();
@@ -739,15 +799,15 @@ tagPickerApply.addEventListener("click", () => {
 tagPickerCreate.addEventListener("click", async () => {
   const tag = normalizeTag(tagPickerTerm);
   if (!tag) return;
-  if (tagPickerMode === "filter") {
-    const { error } = await supabase.from("tags").upsert([{ name: tag }], { onConflict: "name", ignoreDuplicates: true });
-    if (error) { setStatus("Failed to create tag: " + error.message, true); return; }
-  }
-  tagPickerSelection.add(tag);
+  const { data, error } = await supabase.from("tags")
+    .upsert([{ name: tag }], { onConflict: "name" }).select().single();
+  if (error) { setStatus("Failed to create tag: " + error.message, true); return; }
+  tagNames.set(String(data.id), data.name);
+  tagPickerSelection.add(String(data.id));
   syncTagPickerBoxes();
   renderTagPickerSelected();
   updateTagPickerCreate();
-  if (tagPickerMode === "filter") loadTagPicker();
+  loadTagPicker();
 });
 tagFilterClear.addEventListener("click", () => {
   tagFilter = [];

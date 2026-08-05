@@ -3,9 +3,9 @@
 -- no tags until you edit and save them).
 
 -- Tags registry. The authoritative per-recipe assignment lives in
--- recipes.meta_info -> 'tags' (an array of lowercased names); this table is
--- the registry used to browse, search and count tags without scanning every
--- recipe.
+-- recipes.meta_info -> 'tags' (an array of tag ids); this table is the
+-- registry used to browse, search and count tags without scanning every
+-- recipe. Storing ids means renaming a tag only touches this table.
 create table if not exists public.tags (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
@@ -46,7 +46,7 @@ select
   t.name,
   count(r.id)::integer as recipe_count
 from public.tags t
-left join public.recipes r on (r.meta_info -> 'tags') ? t.name
+left join public.recipes r on (r.meta_info -> 'tags') ? t.id::text
 group by t.id, t.name;
 
 grant select on public.tag_stats to authenticated;

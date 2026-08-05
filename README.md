@@ -22,13 +22,17 @@ Then open http://localhost:8000.
    `steps`, `cookware`, `media`, and `tags`. Ingredients, steps, and cookware
    are ordered, optionally grouped into sections, and can each hold their own
    photos/videos via the `media` table. Tags are stored on each recipe in its
-   `meta_info` JSON column, with a `tags` registry table (and `tag_stats` view
-   showing each tag's recipe count) for browsing and filtering. It also creates
+   `meta_info` JSON column as tag ids, with a `tags` registry table (and
+   `tag_stats` view showing each tag's recipe count) for browsing and
+   filtering. Storing ids means a tag can be renamed without touching recipes.
+   It also creates
    a private `recipe-media` Storage bucket for the files (served through signed
    URLs).
    > If the project was set up with the older, open `anon` policies, run
    > `sql/migrate_auth.sql` instead — it removes the anonymous access.
    > If the project predates tags, run `sql/tags.sql` to add them.
+   > If tags already exist in the older name-based format, run
+   > `sql/migrate_tags_to_ids.sql` once to convert them to ids.
 3. Open **Project Settings -> API** and copy the **Project URL** and the
    **anon public key**.
 4. Put both values into `config.js`:
