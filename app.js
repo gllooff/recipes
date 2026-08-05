@@ -35,6 +35,9 @@ const recipeMediaPreview = document.querySelector("#recipe-media-preview");
 let recipes = [];
 let pageSize = 5;
 let currentPage = 1;
+let totalCount = 0;
+let loadSeq = 0;
+let searchTimer = null;
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -315,7 +318,7 @@ form.addEventListener("submit", async e => {
 
   resetForm();
   setStatus(editingId ? "Recipe updated." : "Recipe saved.");
-  await load();
+  await load({ goToFirst: !editingId });
 });
 
 // ---------- Rendering ----------
@@ -373,15 +376,6 @@ function stepsList(items) {
     }).join("")}`).join("")}</ol>`;
 }
 
-function matches(r, q) {
-  const haystack = [r.title, r.notes];
-  (r.ingredients || []).forEach(i => haystack.push(i.amount, i.name, i.note));
-  (r.steps || []).forEach(s => haystack.push(s.text, s.notes, s.section));
-  (r.cookware || []).forEach(c => haystack.push(c.name, c.note));
-  (r.media || []).forEach(m => haystack.push(m.alt));
-  return haystack.join(" ").toLowerCase().includes(q);
-}
-
 function renderPagination(totalPages) {
   const pageBtn = n => `<button type="button" class="page-btn${n === currentPage ? " active" : ""}" data-page="${n}"${n === currentPage ? ' aria-current="page"' : ""}>${n}</button>`;
   const ellipsis = '<span class="page-ellipsis">…</span>';
@@ -406,20 +400,18 @@ function renderPagination(totalPages) {
 }
 
 function render() {
-  const q = searchInput.value.trim().toLowerCase();
-  const shown = q ? recipes.filter(r => matches(r, q)) : recipes;
-  const totalPages = Math.max(1, Math.ceil(shown.length / pageSize));
+  const totalPages = Number.isFinite(pageSize) ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1;
   currentPage = Math.min(currentPage, totalPages);
-  const start = (currentPage - 1) * pageSize;
-  const page = shown.slice(start, start + pageSize);
+  const start = Number.isFinite(pageSize) ? (currentPage - 1) * pageSize : 0;
+  const end = Number.isFinite(pageSize) ? Math.min(totalCount, start + pageSize) : totalCount;
 
-  countEl.textContent = shown.length
-    ? `Showing ${start + 1}–${start + page.length} of ${shown.length} recipe${shown.length === 1 ? "" : "s"}`
+  countEl.textContent = totalCount
+    ? `Showing ${start + 1}–${end} of ${totalCount} recipe${totalCount === 1 ? "" : "s"}`
     : "No recipes";
-  emptyEl.classList.toggle("hidden", shown.length > 0);
+  emptyEl.classList.toggle("hidden", recipes.length > 0);
   paginationEl.classList.toggle("hidden", totalPages <= 1);
 
-  list.innerHTML = page.map(r => `
+  list.innerHTML = recipes.map(r => `
     <li class="recipe" data-id="${r.id}">
       <h3>${escapeHtml(r.title)}</h3>
       <p class="meta">Added ${formatDate(r.created_at)}</p>
@@ -445,14 +437,38 @@ async function attachSignedUrls(r) {
   }
 }
 
-async function load() {
+function escapeLike(term) {
+  return term.replace(/,/g, "%2C").replace(/\(/g, "%28").replace(/\)/g, "%29");
+}
+
+function applySearch(q, query) {
+  if (!q) return query;
+  const safe = escapeLike(q);
+  return query.or(`title.ilike.%${safe}%,notes.ilike.%${safe}%`);
+}
+
+async function load({ goToFirst = false } = {}) {
   if (!config || !isAuthed) return;
+  if (goToFirst) currentPage = 1;
+  const seq = ++loadSeq;
   setStatus("Loading…");
-  const { data, error } = await supabase
+  const q = searchInput.value.trim();
+  const start = (currentPage - 1) * pageSize;
+
+  const countQuery = applySearch(q, supabase
+    .from("recipes")
+    .select("id", { count: "exact", head: true }));
+  let dataQuery = applySearch(q, supabase
     .from("recipes")
     .select("*, ingredients(*, media(*)), steps(*, media(*)), cookware(*, media(*)), media(*)")
-    .order("created_at", { ascending: false });
-  if (error) { setStatus("Failed to load recipes: " + error.message, true); return; }
+    .order("created_at", { ascending: false }));
+  if (Number.isFinite(pageSize)) dataQuery = dataQuery.range(start, start + pageSize - 1);
+
+  const [{ count, error: countError }, { data, error }] = await Promise.all([countQuery, dataQuery]);
+  if (seq !== loadSeq) return;
+  if (countError || error) { setStatus("Failed to load recipes: " + (countError || error).message, true); return; }
+
+  totalCount = count || 0;
   recipes = (data || []).map(r => ({
     ...r,
     ingredients: (r.ingredients || []).sort((a, b) => a.position - b.position),
@@ -460,6 +476,10 @@ async function load() {
     cookware: (r.cookware || []).sort((a, b) => a.position - b.position),
     media: (r.media || []).sort((a, b) => a.sort_order - b.sort_order),
   }));
+  if (recipes.length === 0 && currentPage > 1 && totalCount > 0) {
+    currentPage = Math.max(1, Math.ceil(totalCount / pageSize));
+    return load();
+  }
   for (const r of recipes) await attachSignedUrls(r);
   render();
   setStatus("");
@@ -500,19 +520,22 @@ resetFormBtn.addEventListener("click", () => {
   setStatus("");
 });
 
-searchInput.addEventListener("input", render);
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { currentPage = 1; load(); }, 300);
+});
 
 pageSizeSelect.addEventListener("change", () => {
   pageSize = pageSizeSelect.value === "0" ? Number.MAX_SAFE_INTEGER : parseInt(pageSizeSelect.value, 10);
   currentPage = 1;
-  render();
+  load();
 });
 
 paginationEl.addEventListener("click", e => {
   const btn = e.target.closest("button[data-page]");
   if (!btn || btn.disabled) return;
   currentPage = parseInt(btn.dataset.page, 10);
-  render();
+  load();
   list.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
@@ -549,6 +572,7 @@ function applySession(session) {
     load();
   } else {
     recipes = [];
+    totalCount = 0;
     showAuth();
     render();
   }
