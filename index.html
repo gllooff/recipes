@@ -39,7 +39,15 @@
     <section class="recipes" aria-label="Saved recipes">
       <div class="recipes-header">
         <h2>Saved recipes</h2>
-        <input id="search" type="search" placeholder="Search recipes…" autocomplete="off" aria-label="Search recipes">
+        <div class="recipes-header-actions">
+          <input id="search" type="search" placeholder="Search recipes…" autocomplete="off" aria-label="Search recipes">
+          <button type="button" id="tag-filter-btn" class="secondary">Tags</button>
+        </div>
+      </div>
+      <div id="tag-filter" class="tag-filter hidden" aria-live="polite">
+        <span class="tag-filter-label">Filter by:</span>
+        <div id="tag-filter-chips" class="tag-chips"></div>
+        <button type="button" id="tag-filter-clear" class="secondary">Clear</button>
       </div>
       <div class="recipes-toolbar">
         <p id="count" class="count" aria-live="polite"></p>
@@ -64,6 +72,12 @@
       <form id="recipe-form" class="recipe-form">
         <label>Title <input id="title" name="title" type="text" required placeholder="e.g. Butter chicken" autocomplete="off"></label>
         <label>Notes <textarea id="notes" name="notes" rows="2" placeholder="Optional"></textarea></label>
+
+        <div class="form-group">
+          <h3>Tags</h3>
+          <div id="tag-chips" class="tag-chips"></div>
+          <button type="button" id="tag-browse-btn" class="secondary">Browse tags</button>
+        </div>
 
         <div class="form-group">
           <h3>Ingredients</h3>
@@ -98,6 +112,24 @@
       </form>
     </section>
   </main>
+
+  <div id="tag-picker" class="modal hidden" role="dialog" aria-modal="true" aria-label="Choose tags">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h2 id="tag-picker-title">Filter by tags</h2>
+        <button type="button" id="tag-picker-close" class="secondary">Close</button>
+      </div>
+      <input id="tag-picker-search" type="search" placeholder="Search tags…" autocomplete="off" aria-label="Search tags">
+      <div id="tag-picker-selected" class="tag-chips hidden"></div>
+      <p id="tag-picker-count" class="count"></p>
+      <ul id="tag-picker-list" class="tag-picker-list"></ul>
+      <nav id="tag-picker-pagination" class="pagination hidden" aria-label="Tag pages"></nav>
+      <div class="modal-actions">
+        <button type="button" id="tag-picker-create" class="secondary hidden">+ Create tag</button>
+        <button type="button" id="tag-picker-apply">Apply</button>
+      </div>
+    </div>
+  </div>
   <button type="button" id="back-to-top" class="back-to-top hidden" aria-label="Back to top">↑</button>
   <script src="config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

@@ -18,13 +18,17 @@ Then open http://localhost:8000.
 
 1. Create a free account at https://supabase.com and start a new project.
 2. In the Supabase dashboard, open **SQL Editor** and run the contents of
-   `sql/schema.sql`. This creates five tables — `recipes`, `ingredients`,
-   `steps`, `cookware`, and `media`. Ingredients, steps, and cookware are
-   ordered, optionally grouped into sections, and can each hold their own
-   photos/videos via the `media` table. It also creates a private
-   `recipe-media` Storage bucket for the files (served through signed URLs).
+   `sql/schema.sql`. This creates six tables — `recipes`, `ingredients`,
+   `steps`, `cookware`, `media`, and `tags`. Ingredients, steps, and cookware
+   are ordered, optionally grouped into sections, and can each hold their own
+   photos/videos via the `media` table. Tags are stored on each recipe in its
+   `meta_info` JSON column, with a `tags` registry table (and `tag_stats` view
+   showing each tag's recipe count) for browsing and filtering. It also creates
+   a private `recipe-media` Storage bucket for the files (served through signed
+   URLs).
    > If the project was set up with the older, open `anon` policies, run
    > `sql/migrate_auth.sql` instead — it removes the anonymous access.
+   > If the project predates tags, run `sql/tags.sql` to add them.
 3. Open **Project Settings -> API** and copy the **Project URL** and the
    **anon public key**.
 4. Put both values into `config.js`:

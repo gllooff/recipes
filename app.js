@@ -13,6 +13,22 @@ const banner = document.querySelector("#config-banner");
 const pageSizeSelect = document.querySelector("#page-size");
 const paginationEl = document.querySelector("#pagination");
 const refreshBtn = document.querySelector("#refresh");
+const tagChipsEl = document.querySelector("#tag-chips");
+const tagBrowseBtn = document.querySelector("#tag-browse-btn");
+const tagFilterBtn = document.querySelector("#tag-filter-btn");
+const tagFilterEl = document.querySelector("#tag-filter");
+const tagFilterChips = document.querySelector("#tag-filter-chips");
+const tagFilterClear = document.querySelector("#tag-filter-clear");
+const tagPicker = document.querySelector("#tag-picker");
+const tagPickerTitle = document.querySelector("#tag-picker-title");
+const tagPickerClose = document.querySelector("#tag-picker-close");
+const tagPickerSearch = document.querySelector("#tag-picker-search");
+const tagPickerSelected = document.querySelector("#tag-picker-selected");
+const tagPickerCount = document.querySelector("#tag-picker-count");
+const tagPickerList = document.querySelector("#tag-picker-list");
+const tagPickerPagination = document.querySelector("#tag-picker-pagination");
+const tagPickerCreate = document.querySelector("#tag-picker-create");
+const tagPickerApply = document.querySelector("#tag-picker-apply");
 
 const appEl = document.querySelector("#app");
 const authScreen = document.querySelector("#auth-screen");
@@ -38,6 +54,15 @@ let currentPage = 1;
 let totalCount = 0;
 let loadSeq = 0;
 let searchTimer = null;
+let formTags = [];
+let tagFilter = [];
+let tagPickerSelection = new Set();
+let tagPickerTerm = "";
+let tagPickerPage = 1;
+let tagPickerTotal = 0;
+let tagPickerSearchTimer = null;
+let tagPickerMode = "filter";
+const TAG_PICKER_PAGE_SIZE = 20;
 
 function setStatus(message, isError = false) {
   statusEl.textContent = message;
@@ -170,6 +195,8 @@ function populateEditor(kind, rows) {
 function populateForm(r) {
   form.title.value = r.title;
   form.notes.value = r.notes || "";
+  formTags = Array.isArray(r.meta_info?.tags) ? r.meta_info.tags.map(t => String(t).toLowerCase()) : [];
+  renderFormTagChips();
   populateEditor("ingredient", r.ingredients);
   populateEditor("step", r.steps);
   populateEditor("cookware", r.cookware);
@@ -184,8 +211,47 @@ function resetForm() {
   delete form.dataset.editingId;
   ["ingredient", "step", "cookware"].forEach(k => { editors[k].innerHTML = ""; });
   recipeMediaPreview.innerHTML = "";
+  formTags = [];
+  renderFormTagChips();
   form.querySelector("button[type=submit]").textContent = "Save recipe";
   resetFormBtn.textContent = "Clear";
+}
+
+// ---------- Tags ----------
+
+function normalizeTag(s) {
+  return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function renderTagChips(container, tags, onRemove) {
+  container.innerHTML = tags.map(t => `
+    <span class="tag-chip">${escapeHtml(t)}
+      <button type="button" class="tag-remove" data-tag="${escapeHtml(t)}" title="Remove tag">×</button>
+    </span>`).join("");
+  container.querySelectorAll(".tag-remove").forEach(btn => {
+    btn.addEventListener("click", () => onRemove(btn.dataset.tag));
+  });
+}
+
+function renderFormTagChips() {
+  renderTagChips(tagChipsEl, formTags, tag => {
+    formTags = formTags.filter(t => t !== tag);
+    renderFormTagChips();
+  });
+}
+
+function renderTagFilterChips() {
+  tagFilterEl.classList.toggle("hidden", !tagFilter.length);
+  renderTagChips(tagFilterChips, tagFilter, tag => {
+    tagFilter = tagFilter.filter(t => t !== tag);
+    renderTagFilterChips();
+    currentPage = 1;
+    load();
+  });
+}
+
+function applyTagFilter(query) {
+  return tagFilter.length ? query.contains("meta_info", { tags: tagFilter }) : query;
 }
 
 // ---------- Saving ----------
@@ -268,6 +334,8 @@ form.addEventListener("submit", async e => {
   for (const r of stepRows) if (!r.text) { setStatus("Every step needs instructions.", true); return; }
   for (const r of cookwareRows) if (!r.name) { setStatus("Every cookware item needs a name.", true); return; }
 
+  const tags = [...formTags];
+
   setStatus("Saving…");
   const editingId = form.dataset.editingId;
   const oldRecipe = editingId ? recipes.find(x => x.id === editingId) : null;
@@ -276,12 +344,17 @@ form.addEventListener("submit", async e => {
 
   let recipeId = editingId;
   if (recipeId) {
-    const { error } = await supabase.from("recipes").update({ title, notes }).eq("id", recipeId);
+    const { error } = await supabase.from("recipes").update({ title, notes, meta_info: { ...(oldRecipe?.meta_info || {}), tags } }).eq("id", recipeId);
     if (error) { setStatus("Failed to save: " + error.message, true); return; }
   } else {
-    const { data, error } = await supabase.from("recipes").insert({ title, notes }).select();
+    const { data, error } = await supabase.from("recipes").insert({ title, notes, meta_info: { tags } }).select();
     if (error) { setStatus("Failed to save: " + error.message, true); return; }
     recipeId = data[0].id;
+  }
+
+  if (tags.length) {
+    const { error } = await supabase.from("tags").upsert(tags.map(name => ({ name })), { onConflict: "name", ignoreDuplicates: true });
+    if (error) setStatus("Failed to save tags: " + error.message, true);
   }
 
   if (editingId) {
@@ -399,6 +472,12 @@ function renderPagination(totalPages) {
   paginationEl.innerHTML = buttons.join("");
 }
 
+function tagListFor(r) {
+  const tags = Array.isArray(r.meta_info?.tags) ? r.meta_info.tags : [];
+  if (!tags.length) return "";
+  return `<p class="tag-list">${tags.map(t => `<span class="tag-chip static">${escapeHtml(t)}</span>`).join("")}</p>`;
+}
+
 function render() {
   const totalPages = Number.isFinite(pageSize) ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1;
   currentPage = Math.min(currentPage, totalPages);
@@ -415,6 +494,7 @@ function render() {
     <li class="recipe" data-id="${r.id}">
       <h3>${escapeHtml(r.title)}</h3>
       <p class="meta">Added ${formatDate(r.created_at)}</p>
+      ${tagListFor(r)}
       ${mediaGallery(r.media)}
       ${(r.ingredients || []).length ? `<section><h4>Ingredients</h4>${ingredientList(r.ingredients)}</section>` : ""}
       ${(r.cookware || []).length ? `<section><h4>Cookware</h4>${cookwareList(r.cookware)}</section>` : ""}
@@ -455,13 +535,13 @@ async function load({ goToFirst = false } = {}) {
   const q = searchInput.value.trim();
   const start = (currentPage - 1) * pageSize;
 
-  const countQuery = applySearch(q, supabase
+  const countQuery = applyTagFilter(applySearch(q, supabase
     .from("recipes")
-    .select("id", { count: "exact", head: true }));
-  let dataQuery = applySearch(q, supabase
+    .select("id", { count: "exact", head: true })));
+  let dataQuery = applyTagFilter(applySearch(q, supabase
     .from("recipes")
     .select("*, ingredients(*, media(*)), steps(*, media(*)), cookware(*, media(*)), media(*)")
-    .order("created_at", { ascending: false }));
+    .order("created_at", { ascending: false })));
   if (Number.isFinite(pageSize)) dataQuery = dataQuery.range(start, start + pageSize - 1);
 
   const [{ count, error: countError }, { data, error }] = await Promise.all([countQuery, dataQuery]);
@@ -537,6 +617,166 @@ paginationEl.addEventListener("click", e => {
   currentPage = parseInt(btn.dataset.page, 10);
   load();
   list.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+// ---------- Tag picker ----------
+
+function renderTagPickerPagination(totalPages) {
+  const pageBtn = n => `<button type="button" class="page-btn${n === tagPickerPage ? " active" : ""}" data-page="${n}"${n === tagPickerPage ? ' aria-current="page"' : ""}>${n}</button>`;
+  const ellipsis = '<span class="page-ellipsis">…</span>';
+  const buttons = [
+    `<button type="button" class="page-btn nav" data-page="${tagPickerPage - 1}"${tagPickerPage <= 1 ? " disabled" : ""}>Prev</button>`,
+  ];
+  const windowStart = Math.max(1, Math.min(tagPickerPage - 2, totalPages - 4));
+  const windowEnd = Math.min(totalPages, windowStart + 4);
+  if (windowStart > 1) {
+    buttons.push(pageBtn(1));
+    if (windowStart > 2) buttons.push(ellipsis);
+  }
+  for (let i = windowStart; i <= windowEnd; i++) buttons.push(pageBtn(i));
+  if (windowEnd < totalPages) {
+    if (windowEnd < totalPages - 1) buttons.push(ellipsis);
+    buttons.push(pageBtn(totalPages));
+  }
+  buttons.push(
+    `<button type="button" class="page-btn nav" data-page="${tagPickerPage + 1}"${tagPickerPage >= totalPages ? " disabled" : ""}>Next</button>`,
+  );
+  tagPickerPagination.innerHTML = buttons.join("");
+  tagPickerPagination.classList.toggle("hidden", totalPages <= 1);
+}
+
+async function loadTagPicker() {
+  if (!config || !isAuthed) return;
+  let query = supabase
+    .from("tag_stats")
+    .select("id, name, recipe_count", { count: "exact" })
+    .order("name", { ascending: true });
+  if (tagPickerTerm) query = query.ilike("name", `%${escapeLike(tagPickerTerm)}%`);
+  const start = (tagPickerPage - 1) * TAG_PICKER_PAGE_SIZE;
+  const { count, data, error } = await query.range(start, start + TAG_PICKER_PAGE_SIZE - 1);
+  if (error) { setStatus("Failed to load tags: " + error.message, true); return; }
+  tagPickerTotal = count || 0;
+  const totalPages = Math.max(1, Math.ceil(tagPickerTotal / TAG_PICKER_PAGE_SIZE));
+  if (!(data || []).length && tagPickerPage > 1) {
+    tagPickerPage = totalPages;
+    return loadTagPicker();
+  }
+  tagPickerCount.textContent = tagPickerTotal
+    ? `${tagPickerTotal} tag${tagPickerTotal === 1 ? "" : "s"}`
+    : "No tags";
+  const names = (data || []).map(t => t.name);
+  tagPickerList.innerHTML = (data || []).map(t => `
+    <li>
+      <label class="tag-picker-item">
+        <input type="checkbox" data-tag="${escapeHtml(t.name)}"${tagPickerSelection.has(t.name) ? " checked" : ""}>
+        <span class="tag-name">${escapeHtml(t.name)}</span>
+        <span class="tag-count">${t.recipe_count} recipe${t.recipe_count === 1 ? "" : "s"}</span>
+      </label>
+    </li>`).join("");
+  renderTagPickerPagination(totalPages);
+  updateTagPickerCreate(names);
+}
+
+function renderTagPickerSelected() {
+  tagPickerSelected.classList.toggle("hidden", !tagPickerSelection.size);
+  renderTagChips(tagPickerSelected, [...tagPickerSelection].sort(), tag => {
+    tagPickerSelection.delete(tag);
+    syncTagPickerBoxes();
+    renderTagPickerSelected();
+    updateTagPickerCreate();
+  });
+}
+
+function syncTagPickerBoxes() {
+  tagPickerList.querySelectorAll("input[type=checkbox]").forEach(box => {
+    box.checked = tagPickerSelection.has(box.dataset.tag);
+  });
+}
+
+function updateTagPickerCreate(names) {
+  const term = normalizeTag(tagPickerTerm);
+  const exactMatch = (names || []).some(n => n === term);
+  const show = !!term && !exactMatch && !tagPickerSelection.has(term);
+  tagPickerCreate.classList.toggle("hidden", !show);
+  if (show) tagPickerCreate.textContent = `+ Create tag “${tagPickerTerm.trim()}”`;
+}
+
+function openTagPicker(mode) {
+  tagPickerMode = mode;
+  tagPickerSelection = new Set(mode === "form" ? formTags : tagFilter);
+  tagPickerTerm = "";
+  tagPickerPage = 1;
+  tagPickerSearch.value = "";
+  tagPickerTitle.textContent = mode === "form" ? "Add tags" : "Filter by tags";
+  renderTagPickerSelected();
+  tagPicker.classList.remove("hidden");
+  tagPickerSearch.focus();
+  loadTagPicker();
+}
+
+tagBrowseBtn.addEventListener("click", () => openTagPicker("form"));
+tagFilterBtn.addEventListener("click", () => openTagPicker("filter"));
+tagPickerClose.addEventListener("click", () => tagPicker.classList.add("hidden"));
+tagPicker.addEventListener("click", e => {
+  if (e.target === tagPicker) tagPicker.classList.add("hidden");
+});
+window.addEventListener("keydown", e => {
+  if (e.key === "Escape") tagPicker.classList.add("hidden");
+});
+tagPickerApply.addEventListener("click", () => {
+  const selected = [...tagPickerSelection].sort();
+  if (tagPickerMode === "form") {
+    formTags = selected;
+    renderFormTagChips();
+  } else {
+    tagFilter = selected;
+    renderTagFilterChips();
+    currentPage = 1;
+    load();
+  }
+  tagPicker.classList.add("hidden");
+});
+tagPickerCreate.addEventListener("click", async () => {
+  const tag = normalizeTag(tagPickerTerm);
+  if (!tag) return;
+  if (tagPickerMode === "filter") {
+    const { error } = await supabase.from("tags").upsert([{ name: tag }], { onConflict: "name", ignoreDuplicates: true });
+    if (error) { setStatus("Failed to create tag: " + error.message, true); return; }
+  }
+  tagPickerSelection.add(tag);
+  syncTagPickerBoxes();
+  renderTagPickerSelected();
+  updateTagPickerCreate();
+  if (tagPickerMode === "filter") loadTagPicker();
+});
+tagFilterClear.addEventListener("click", () => {
+  tagFilter = [];
+  renderTagFilterChips();
+  currentPage = 1;
+  load();
+});
+tagPickerSearch.addEventListener("input", () => {
+  clearTimeout(tagPickerSearchTimer);
+  tagPickerSearchTimer = setTimeout(() => {
+    tagPickerTerm = tagPickerSearch.value.trim();
+    tagPickerPage = 1;
+    loadTagPicker();
+  }, 250);
+});
+tagPickerList.addEventListener("click", e => {
+  const box = e.target.closest("input[type=checkbox]");
+  if (!box) return;
+  const tag = box.dataset.tag;
+  if (box.checked) tagPickerSelection.add(tag);
+  else tagPickerSelection.delete(tag);
+  renderTagPickerSelected();
+  updateTagPickerCreate();
+});
+tagPickerPagination.addEventListener("click", e => {
+  const btn = e.target.closest("button[data-page]");
+  if (!btn || btn.disabled) return;
+  tagPickerPage = parseInt(btn.dataset.page, 10);
+  loadTagPicker();
 });
 
 // ---------- Back to top ----------

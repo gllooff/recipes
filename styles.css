@@ -399,8 +399,110 @@ button.danger:hover { border-color: var(--danger); }
 
 .pagination .page-ellipsis { align-self: center; color: var(--muted); padding: 0 .1rem; }
 
+/* Tags */
 
-.hidden { display: none; }
+.tag-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  background: var(--surface-hover);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: .1rem .55rem;
+  font-size: .8rem;
+  color: var(--foreground);
+}
+
+.tag-chip button.tag-remove {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 .15rem;
+  cursor: pointer;
+}
+
+.tag-chip button.tag-remove:hover { color: var(--danger); }
+
+.tag-chip.static { cursor: default; }
+
+#tag-picker-selected { margin-top: -.2rem; }
+
+.tag-list { margin: 0 0 .6rem; display: flex; flex-wrap: wrap; gap: .3rem; }
+
+.recipes-header-actions { display: flex; align-items: center; gap: .5rem; }
+
+.tag-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin: .6rem 0;
+}
+
+.tag-filter-label { color: var(--muted); font-size: .85rem; }
+
+/* Tag picker modal */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #00000099;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+
+.modal-panel {
+  width: 100%;
+  max-width: 420px;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  gap: .8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.4rem;
+}
+
+.modal-header { display: flex; align-items: center; justify-content: space-between; }
+.modal-header h2 { margin: 0; }
+.modal-actions { display: flex; justify-content: flex-end; }
+
+.tag-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  min-height: 140px;
+  max-height: 50vh;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.tag-picker-list li { border-bottom: 1px solid var(--border); }
+.tag-picker-list li:last-child { border-bottom: none; }
+
+.tag-picker-item {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .45rem .6rem;
+  font-size: .9rem;
+  cursor: pointer;
+}
+
+.tag-picker-item:hover { background: var(--surface-hover); }
+.tag-picker-item .tag-name { flex: 1; }
+.tag-picker-item .tag-count { color: var(--muted); font-size: .78rem; }
+
+.hidden { display: none !important; }
 
 .back-to-top {
   position: fixed;
