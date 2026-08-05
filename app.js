@@ -515,6 +515,18 @@ paginationEl.addEventListener("click", e => {
   list.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
+// ---------- Back to top ----------
+
+const backToTopBtn = document.querySelector("#back-to-top");
+
+window.addEventListener("scroll", () => {
+  backToTopBtn.classList.toggle("hidden", window.scrollY < 400);
+}, { passive: true });
+
+backToTopBtn.addEventListener("click", () => {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
 // ---------- Authentication ----------
 
 function showAuth() {
