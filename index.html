@@ -43,6 +43,20 @@
         <div class="recipes-header-actions">
           <input id="search" type="search" placeholder="Search recipes…" autocomplete="off" aria-label="Search recipes">
           <button type="button" id="tag-filter-btn" class="secondary">Tags</button>
+          <button type="button" id="recycle-bin-btn" class="secondary recycle-bin-btn hidden" title="Recycle bin" aria-label="Open recycle bin">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5.5 6h13"/>
+              <path d="M6.5 6 7.4 18.8a2 2 0 0 0 2 2h5.2a2 2 0 0 0 2-2L17.5 6"/>
+              <g transform="translate(6.375 6.8) scale(0.5)" stroke-width="3.8">
+                <path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/>
+                <path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/>
+                <path d="m14 16-3 3 3 3"/>
+                <path d="M8.293 13.596 7.196 9.5 3.1 10.598"/>
+                <path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"/>
+                <path d="m13.378 9.633 4.096 1.098 1.097-4.096"/>
+              </g>
+            </svg>
+          </button>
         </div>
       </div>
       <div id="tag-filter" class="tag-filter hidden" aria-live="polite">
@@ -118,6 +132,20 @@
     </section>
   </main>
 
+  <div id="recycle-bin" class="modal hidden" role="dialog" aria-modal="true" aria-label="Recycle bin">
+    <div class="modal-panel recycle-bin-panel">
+      <div class="modal-header">
+        <h2>Recycle bin</h2>
+        <button type="button" id="recycle-bin-close" class="secondary">Close</button>
+      </div>
+      <p id="recycle-bin-count" class="count"></p>
+      <ul id="recycle-bin-list" class="recycle-bin-list"></ul>
+      <div class="modal-actions">
+        <button type="button" id="recycle-bin-restore-all" class="secondary">Restore all</button>
+        <button type="button" id="recycle-bin-empty" class="danger">Empty bin</button>
+      </div>
+    </div>
+  </div>
   <div id="tag-picker" class="modal hidden" role="dialog" aria-modal="true" aria-label="Choose tags">
     <div class="modal-panel">
       <div class="modal-header">

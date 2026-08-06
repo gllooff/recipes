@@ -25,7 +25,8 @@ Then open http://localhost:8000.
    `meta_info` JSON column as tag ids, with a `tags` registry table (and
    `tag_stats` view showing each tag's recipe count) for browsing and
    filtering. Storing ids means a tag can be renamed without touching recipes.
-   It also creates
+   Deleting a recipe only sets its `deleted_at` column, moving it to the
+   recycle bin where it can be restored or permanently pruned. It also creates
    a private `recipe-media` Storage bucket for the files (served through signed
    URLs).
    > If the project was set up with the older, open `anon` policies, run
@@ -33,6 +34,8 @@ Then open http://localhost:8000.
    > If the project predates tags, run `sql/tags.sql` to add them.
    > If tags already exist in the older name-based format, run
    > `sql/migrate_tags_to_ids.sql` once to convert them to ids.
+   > If the project predates the recycle bin, run `sql/recycle_bin.sql` to add
+   > the soft-delete column and exclude trashed recipes from tag counts.
 3. Open **Project Settings -> API** and copy the **Project URL** and the
    **anon public key**.
 4. Put both values into `config.js`:

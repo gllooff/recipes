@@ -1,14 +1,19 @@
 -- Run this in Supabase: SQL Editor -> New query -> Run.
 
 -- Core recipe content. Ingredients, steps and cookware live in their own
--- tables so they can be ordered, grouped, and attached to media.
+-- tables so they can be ordered, grouped, and attached to media. deleted_at
+-- is set instead of removing the row so deleted recipes land in the recycle
+-- bin; restoring clears it and pruning deletes the row for good.
 create table if not exists public.recipes (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   notes text,
   meta_info jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  deleted_at timestamptz
 );
+
+create index if not exists recipes_deleted_at_idx on public.recipes (deleted_at);
 
 -- Orderable ingredients, optionally grouped into sections.
 create table if not exists public.ingredients (
@@ -166,7 +171,8 @@ create policy "authenticated can delete tags" on public.tags
   for delete to authenticated using (true);
 
 -- Each tag with the number of recipes it is attached to. Runs as the calling
--- user so RLS on the underlying tables still applies.
+-- user so RLS on the underlying tables still applies. Recipes in the recycle
+-- bin are excluded until restored.
 drop view if exists public.tag_stats;
 create view public.tag_stats
   with (security_invoker = true) as
@@ -176,6 +182,7 @@ select
   count(r.id)::integer as recipe_count
 from public.tags t
 left join public.recipes r on (r.meta_info -> 'tags') ? t.id::text
+  and r.deleted_at is null
 group by t.id, t.name;
 
 grant select on public.tag_stats to authenticated;

@@ -553,6 +553,47 @@ button.danger:hover { border-color: var(--danger); }
 .tag-picker-item button.tag-delete { color: var(--danger); }
 .tag-picker-item button.tag-delete:hover { border-color: var(--danger); }
 
+/* Recycle bin */
+
+.recycle-bin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: .4rem .55rem;
+}
+
+.recycle-bin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  min-height: 120px;
+  max-height: 50vh;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.recycle-bin-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .5rem;
+  padding: .6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.recycle-bin-item:last-child { border-bottom: none; }
+
+.recycle-bin-item .bin-title { flex: 1; font-weight: 600; }
+.recycle-bin-item .bin-meta { color: var(--muted); font-size: .78rem; }
+.recycle-bin-item .bin-actions { display: inline-flex; gap: .4rem; }
+.recycle-bin-item .bin-actions button { padding: .35rem .7rem; font-size: .85rem; }
+
+.recycle-bin-panel button:disabled { opacity: .45; cursor: default; }
+.recycle-bin-panel button:disabled:hover { background: var(--accent-strong); }
+.recycle-bin-panel button.secondary:disabled:hover { background: transparent; border-color: var(--border); color: var(--muted); }
+.recycle-bin-panel button.danger:disabled:hover { border-color: var(--border); }
+
 .hidden { display: none !important; }
 
 .back-to-top {
@@ -606,6 +647,7 @@ html { -webkit-text-size-adjust: 100%; }
     padding: 1.1rem;
   }
   .tag-picker-list { flex: 1; max-height: none; }
+  .recycle-bin-list { flex: 1; max-height: none; }
 
   .back-to-top {
     bottom: calc(.8rem + env(safe-area-inset-bottom));
@@ -623,6 +665,7 @@ html { -webkit-text-size-adjust: 100%; }
     padding: 1rem;
   }
   .tag-picker-list { flex: 1; max-height: none; }
+  .recycle-bin-list { flex: 1; max-height: none; }
 }
 
 @media (orientation: portrait) and (max-width: 640px) {

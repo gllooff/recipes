@@ -39,6 +39,13 @@ const authEmail = document.querySelector("#auth-email");
 const authPassword = document.querySelector("#auth-password");
 const authError = document.querySelector("#auth-error");
 const logoutBtn = document.querySelector("#logout");
+const recycleBinBtn = document.querySelector("#recycle-bin-btn");
+const recycleBin = document.querySelector("#recycle-bin");
+const recycleBinClose = document.querySelector("#recycle-bin-close");
+const recycleBinList = document.querySelector("#recycle-bin-list");
+const recycleBinCount = document.querySelector("#recycle-bin-count");
+const recycleBinRestoreAll = document.querySelector("#recycle-bin-restore-all");
+const recycleBinEmpty = document.querySelector("#recycle-bin-empty");
 
 let isAuthed = false;
 
@@ -66,6 +73,7 @@ let tagPickerSearchTimer = null;
 let tagPickerMode = "filter";
 let tagPickerRecipeId = null;
 let tagNames = new Map();
+let binRecipes = [];
 const TAG_PICKER_PAGE_SIZE = 20;
 
 function setStatus(message, isError = false) {
@@ -609,11 +617,13 @@ async function load({ goToFirst = false } = {}) {
 
   const countQuery = applyTagFilter(applySearch(q, supabase
     .from("recipes")
-    .select("id", { count: "exact", head: true })));
+    .select("id", { count: "exact", head: true })))
+    .is("deleted_at", null);
   let dataQuery = applyTagFilter(applySearch(q, supabase
     .from("recipes")
     .select("*, ingredients(*, media(*)), steps(*, media(*)), cookware(*, media(*)), media(*)")
-    .order("created_at", { ascending: false })));
+    .order("created_at", { ascending: false })))
+    .is("deleted_at", null);
   if (Number.isFinite(pageSize)) dataQuery = dataQuery.range(start, start + pageSize - 1);
 
   const [{ count, error: countError }, { data, error }] = await Promise.all([countQuery, dataQuery]);
@@ -657,13 +667,12 @@ list.addEventListener("click", async e => {
   }
 
   if (btn.classList.contains("delete")) {
-    if (!r || !confirm("Delete this recipe and all its media?")) return;
-    setStatus("Deleting…");
-    const paths = flatMedia(r);
-    if (paths.length) await supabase.storage.from("recipe-media").remove(paths);
-    const { error } = await supabase.from("recipes").delete().eq("id", id);
+    if (!r || !confirm(`Move "${r.title}" to the recycle bin? You can restore it later.`)) return;
+    setStatus("Moving to recycle bin…");
+    const { error } = await supabase.from("recipes")
+      .update({ deleted_at: new Date().toISOString() }).eq("id", id);
     if (error) { setStatus("Failed to delete: " + error.message, true); return; }
-    setStatus("Recipe deleted.");
+    setStatus("Recipe moved to the recycle bin.");
     await load();
     return;
   }
@@ -713,6 +722,120 @@ paginationEl.addEventListener("click", e => {
   currentPage = parseInt(btn.dataset.page, 10);
   load();
   list.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+// ---------- Recycle bin ----------
+
+async function fetchFullRecipe(id) {
+  const { data, error } = await supabase.from("recipes")
+    .select("*, ingredients(*, media(*)), steps(*, media(*)), cookware(*, media(*)), media(*)")
+    .eq("id", id)
+    .single();
+  if (error) { setStatus("Failed to load recipe: " + error.message, true); return null; }
+  data.ingredients = (data.ingredients || []).sort((a, b) => a.position - b.position);
+  data.steps = (data.steps || []).sort((a, b) => a.position - b.position);
+  data.cookware = (data.cookware || []).sort((a, b) => a.position - b.position);
+  data.media = (data.media || []).sort((a, b) => a.sort_order - b.sort_order);
+  return data;
+}
+
+async function removeRecipeMedia(id) {
+  const full = await fetchFullRecipe(id);
+  const paths = full ? flatMedia(full) : [];
+  if (paths.length) await supabase.storage.from("recipe-media").remove(paths);
+}
+
+function renderRecycleBin() {
+  recycleBinCount.textContent = binRecipes.length
+    ? `${binRecipes.length} recipe${binRecipes.length === 1 ? "" : "s"} in the bin`
+    : "The bin is empty";
+  recycleBinList.innerHTML = binRecipes.map(r => `
+    <li class="recycle-bin-item">
+      <span class="bin-title">${escapeHtml(r.title)}</span>
+      <span class="bin-meta">Deleted ${escapeHtml(formatDate(r.deleted_at))}</span>
+      <span class="bin-actions">
+        <button type="button" class="secondary bin-restore" data-id="${escapeHtml(r.id)}">Restore</button>
+        <button type="button" class="danger bin-prune" data-id="${escapeHtml(r.id)}" data-title="${escapeHtml(r.title)}">Prune</button>
+      </span>
+    </li>`).join("");
+  recycleBinRestoreAll.disabled = !binRecipes.length;
+  recycleBinEmpty.disabled = !binRecipes.length;
+}
+
+async function loadRecycleBin() {
+  if (!config || !isAuthed) return;
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("id, title, created_at, deleted_at")
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false });
+  if (error) { setStatus("Failed to load recycle bin: " + error.message, true); return; }
+  binRecipes = data || [];
+  renderRecycleBin();
+}
+
+function openRecycleBin() {
+  recycleBin.classList.remove("hidden");
+  loadRecycleBin();
+}
+
+recycleBinBtn.addEventListener("click", openRecycleBin);
+recycleBinClose.addEventListener("click", () => recycleBin.classList.add("hidden"));
+recycleBin.addEventListener("click", e => {
+  if (e.target === recycleBin) recycleBin.classList.add("hidden");
+});
+
+recycleBinList.addEventListener("click", async e => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  const r = binRecipes.find(x => x.id === id);
+  if (!r) return;
+
+  if (btn.classList.contains("bin-restore")) {
+    const { error } = await supabase.from("recipes").update({ deleted_at: null }).eq("id", id);
+    if (error) { setStatus("Failed to restore: " + error.message, true); return; }
+    setStatus(`"${r.title}" restored.`);
+    loadRecycleBin();
+    await load();
+    return;
+  }
+
+  if (btn.classList.contains("bin-prune")) {
+    if (!confirm(`Permanently delete "${r.title}"? This cannot be undone and will also remove all its photos and videos.`)) return;
+    setStatus("Pruning…");
+    await removeRecipeMedia(id);
+    const { error } = await supabase.from("recipes").delete().eq("id", id);
+    if (error) { setStatus("Failed to delete: " + error.message, true); return; }
+    setStatus(`"${r.title}" permanently deleted.`);
+    loadRecycleBin();
+    await load();
+  }
+});
+
+recycleBinRestoreAll.addEventListener("click", async () => {
+  if (!binRecipes.length) return;
+  if (!confirm(`Restore all ${binRecipes.length} recipe${binRecipes.length === 1 ? "" : "s"} from the recycle bin?`)) return;
+  setStatus("Restoring…");
+  const { error } = await supabase.from("recipes")
+    .update({ deleted_at: null }).not("deleted_at", "is", null);
+  if (error) { setStatus("Failed to restore: " + error.message, true); return; }
+  setStatus("Recycle bin restored.");
+  loadRecycleBin();
+  await load();
+});
+
+recycleBinEmpty.addEventListener("click", async () => {
+  if (!binRecipes.length) return;
+  if (!confirm(`Empty the recycle bin? All ${binRecipes.length} recipe${binRecipes.length === 1 ? "" : "s"} and their photos and videos will be permanently deleted. This cannot be undone.`)) return;
+  setStatus("Emptying…");
+  for (const r of binRecipes) await removeRecipeMedia(r.id);
+  const { error } = await supabase.from("recipes").delete().not("deleted_at", "is", null);
+  if (error) { setStatus("Failed to empty bin: " + error.message, true); return; }
+  binRecipes = [];
+  renderRecycleBin();
+  setStatus("Recycle bin emptied.");
+  await load();
 });
 
 // ---------- Tag picker ----------
@@ -828,6 +951,7 @@ tagPicker.addEventListener("click", e => {
 window.addEventListener("keydown", e => {
   if (e.key === "Escape") {
     tagPicker.classList.add("hidden");
+    recycleBin.classList.add("hidden");
     if (!addRecipeSection.classList.contains("hidden")) discardForm();
   }
 });
@@ -975,12 +1099,14 @@ function applySession(session) {
   logoutBtn.classList.toggle("hidden", !session);
   refreshBtn.classList.toggle("hidden", !session);
   addRecipeToggle.classList.toggle("hidden", !session);
+  recycleBinBtn.classList.toggle("hidden", !session);
   if (session) {
     showApp();
     load();
   } else {
     recipes = [];
     totalCount = 0;
+    binRecipes = [];
     showAuth();
     render();
   }
