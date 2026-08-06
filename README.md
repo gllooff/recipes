@@ -73,3 +73,41 @@ manually from the **Actions** tab.
 3. The site is served from `https://<user>.github.io/<repo-name>/`.
 
 Until `config.js` is filled in, the page shows a banner instead of connecting.
+
+## Troubleshooting: deployment stuck in "queued"
+
+If the workflow uses a self-hosted runner and a run sits in **queued/waiting**
+forever (even though **Settings -> Actions -> Runners** shows the runner as
+**online** and idle), the runner's job-message connection to GitHub has
+silently died. On runners inside WSL2/NAT this happens after network or sleep
+events: the long-lived socket to `broker.actions.githubusercontent.com` is
+dropped, so the runner still appears online (its token refresh keeps working)
+but it never receives new jobs.
+
+Symptoms:
+
+- `gh run list` shows the run as `queued`.
+- `gh api repos/<owner>/<repo>/actions/runs/<id>/jobs` returns
+  `"status":"waiting"` with `"runner_name":null`.
+- The runner's diagnostic log (`_diag/Runner_*.log`) contains
+  `SocketException (125): Operation canceled` from `BrokerServer`, followed by
+  no further broker activity.
+
+Fix — restart the runner service so it reconnects to the broker:
+
+```sh
+sudo systemctl restart actions.runner.<org>-<repo>.<runner-name>.service
+```
+
+Then confirm the runner is picking up jobs again:
+
+```sh
+gh run list --workflow "Deploy to GitHub Pages" --limit 3
+```
+
+The stuck run usually cannot be recovered; cancel it and trigger a fresh one:
+
+```sh
+gh run cancel <run-id>
+gh workflow run "Deploy to GitHub Pages"
+```
