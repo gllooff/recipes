@@ -66,6 +66,14 @@
       </div>
       <div class="recipes-toolbar">
         <p id="count" class="count" aria-live="polite"></p>
+        <label class="sort">Sort
+          <select id="sort">
+            <option value="created_at-desc" selected>Newest</option>
+            <option value="created_at-asc">Oldest</option>
+            <option value="title-asc">Name A–Z</option>
+            <option value="title-desc">Name Z–A</option>
+          </select>
+        </label>
         <label class="page-size">Per page
           <select id="page-size">
             <option value="5" selected>5</option>

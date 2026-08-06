@@ -11,6 +11,7 @@ const emptyEl = document.querySelector("#empty");
 const statusEl = document.querySelector("#status");
 const banner = document.querySelector("#config-banner");
 const pageSizeSelect = document.querySelector("#page-size");
+const sortSelect = document.querySelector("#sort");
 const paginationEl = document.querySelector("#pagination");
 const refreshBtn = document.querySelector("#refresh");
 const addRecipeToggle = document.querySelector("#add-recipe-toggle");
@@ -61,6 +62,8 @@ let recipes = [];
 let pageSize = 5;
 let currentPage = 1;
 let totalCount = 0;
+let sortColumn = "created_at";
+let sortAscending = false;
 let loadSeq = 0;
 let searchTimer = null;
 let formTags = [];
@@ -622,7 +625,7 @@ async function load({ goToFirst = false } = {}) {
   let dataQuery = applyTagFilter(applySearch(q, supabase
     .from("recipes")
     .select("*, ingredients(*, media(*)), steps(*, media(*)), cookware(*, media(*)), media(*)")
-    .order("created_at", { ascending: false })))
+    .order(sortColumn, { ascending: sortAscending })))
     .is("deleted_at", null);
   if (Number.isFinite(pageSize)) dataQuery = dataQuery.range(start, start + pageSize - 1);
 
@@ -712,6 +715,14 @@ searchInput.addEventListener("input", () => {
 
 pageSizeSelect.addEventListener("change", () => {
   pageSize = pageSizeSelect.value === "0" ? Number.MAX_SAFE_INTEGER : parseInt(pageSizeSelect.value, 10);
+  currentPage = 1;
+  load();
+});
+
+sortSelect.addEventListener("change", () => {
+  const [field, dir] = sortSelect.value.split("-");
+  sortColumn = field;
+  sortAscending = dir === "asc";
   currentPage = 1;
   load();
 });

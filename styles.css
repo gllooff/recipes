@@ -236,6 +236,7 @@ button.danger:hover { border-color: var(--danger); }
 
 .recipes-toolbar .count { margin: 0; }
 
+.sort,
 .page-size {
   display: flex;
   align-items: center;
@@ -245,6 +246,7 @@ button.danger:hover { border-color: var(--danger); }
   font-weight: 600;
 }
 
+.sort select,
 .page-size select {
   background: var(--background);
   border: 1px solid var(--border);
@@ -619,7 +621,7 @@ html { -webkit-text-size-adjust: 100%; }
 .row > input, .row .row-section, .row .row-duration { min-width: 0; }
 
 @media (pointer: coarse) {
-  button, .page-size select, .tag-picker-item { min-height: 44px; }
+  button, .sort select, .page-size select, .tag-picker-item { min-height: 44px; }
   .row .row-actions button { min-height: 40px; padding: .4rem .75rem; }
   .tag-chip button.tag-remove { min-width: 40px; min-height: 40px; }
   input, textarea, select { font-size: 16px; }
@@ -635,7 +637,7 @@ html { -webkit-text-size-adjust: 100%; }
   #search { width: 100%; }
 
   .recipes-toolbar { flex-wrap: wrap; gap: .5rem; }
-  .recipes-toolbar .page-size { margin-left: auto; }
+  .recipes-toolbar .sort { margin-left: auto; }
 
   .modal { padding: 0; align-items: stretch; }
   .modal-panel {
