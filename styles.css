@@ -475,6 +475,35 @@ button.danger:hover { border-color: var(--danger); }
 .modal-header h2 { margin: 0; }
 .modal-actions { display: flex; justify-content: flex-end; }
 
+#add-recipe-section.controls {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: #00000099;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  overflow-y: auto;
+}
+
+.add-recipe-panel {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  gap: .8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.4rem;
+  overflow-y: auto;
+}
+
 .tag-picker-list {
   list-style: none;
   margin: 0;

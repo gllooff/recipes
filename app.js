@@ -3,7 +3,7 @@ const config = window.SUPABASE_URL && window.SUPABASE_ANON_KEY
   : null;
 
 const form = document.querySelector("#recipe-form");
-const resetFormBtn = document.querySelector("#reset-form");
+const cancelFormBtn = document.querySelector("#cancel-form");
 const searchInput = document.querySelector("#search");
 const list = document.querySelector("#recipe-list");
 const countEl = document.querySelector("#count");
@@ -13,6 +13,8 @@ const banner = document.querySelector("#config-banner");
 const pageSizeSelect = document.querySelector("#page-size");
 const paginationEl = document.querySelector("#pagination");
 const refreshBtn = document.querySelector("#refresh");
+const addRecipeToggle = document.querySelector("#add-recipe-toggle");
+const addRecipeSection = document.querySelector("#add-recipe-section");
 const tagChipsEl = document.querySelector("#tag-chips");
 const tagBrowseBtn = document.querySelector("#tag-browse-btn");
 const tagFilterBtn = document.querySelector("#tag-filter-btn");
@@ -205,7 +207,6 @@ function populateForm(r) {
   recipeMediaPreview.innerHTML = mediaPreviewHtml(r.media || []);
   form.dataset.editingId = r.id;
   form.querySelector("button[type=submit]").textContent = "Update recipe";
-  resetFormBtn.textContent = "Cancel";
 }
 
 function resetForm() {
@@ -216,7 +217,6 @@ function resetForm() {
   formTags = [];
   renderFormTagChips();
   form.querySelector("button[type=submit]").textContent = "Save recipe";
-  resetFormBtn.textContent = "Clear";
 }
 
 // ---------- Tags ----------
@@ -454,6 +454,7 @@ form.addEventListener("submit", async e => {
   if (removed.length) await supabase.storage.from("recipe-media").remove(removed);
 
   resetForm();
+  closeAddRecipe();
   setStatus(editingId ? "Recipe updated." : "Recipe saved.");
   await load({ goToFirst: !editingId });
 });
@@ -669,16 +670,10 @@ list.addEventListener("click", async e => {
 
   if (btn.classList.contains("edit") && r) {
     populateForm(r);
-    form.scrollIntoView({ behavior: "smooth", block: "start" });
-    form.querySelector("#title").focus();
+    openAddRecipe();
     setStatus("Editing — make changes and save.");
     render();
   }
-});
-
-resetFormBtn.addEventListener("click", () => {
-  resetForm();
-  setStatus("");
 });
 
 list.addEventListener("change", async e => {
@@ -831,7 +826,10 @@ tagPicker.addEventListener("click", e => {
   if (e.target === tagPicker) tagPicker.classList.add("hidden");
 });
 window.addEventListener("keydown", e => {
-  if (e.key === "Escape") tagPicker.classList.add("hidden");
+  if (e.key === "Escape") {
+    tagPicker.classList.add("hidden");
+    if (!addRecipeSection.classList.contains("hidden")) discardForm();
+  }
 });
 tagPickerApply.addEventListener("click", async () => {
   const selected = [...tagPickerSelection].sort();
@@ -976,6 +974,7 @@ function applySession(session) {
   isAuthed = !!session;
   logoutBtn.classList.toggle("hidden", !session);
   refreshBtn.classList.toggle("hidden", !session);
+  addRecipeToggle.classList.toggle("hidden", !session);
   if (session) {
     showApp();
     load();
@@ -1003,6 +1002,53 @@ logoutBtn.addEventListener("click", async () => {
 });
 
 refreshBtn.addEventListener("click", () => load());
+
+function openAddRecipe() {
+  addRecipeSection.classList.remove("hidden");
+  addRecipeToggle.textContent = "Close";
+  form.querySelector("#title").focus();
+}
+
+function closeAddRecipe() {
+  resetForm();
+  addRecipeSection.classList.add("hidden");
+  addRecipeToggle.textContent = "Add a recipe";
+}
+
+function rowHasContent(row) {
+  if (row.querySelector(".media-preview")) return true;
+  return Array.from(row.querySelectorAll("input, textarea")).some(i => val(i));
+}
+
+function formIsEmpty() {
+  if (val(form.title) || val(form.notes)) return false;
+  if (formTags.length) return false;
+  if (recipeMediaPreview.querySelector(".media-preview")) return false;
+  if (recipeMediaInput.files.length) return false;
+  for (const k of ["ingredient", "step", "cookware"]) {
+    for (const row of editors[k].querySelectorAll(".row")) {
+      if (rowHasContent(row)) return false;
+    }
+  }
+  return true;
+}
+
+function discardForm() {
+  if (!formIsEmpty() && !confirm("Discard your edits?")) return;
+  closeAddRecipe();
+  setStatus("");
+}
+
+addRecipeToggle.addEventListener("click", () => {
+  if (addRecipeSection.classList.contains("hidden")) openAddRecipe();
+  else discardForm();
+});
+
+addRecipeSection.addEventListener("click", e => {
+  if (e.target === addRecipeSection) discardForm();
+});
+
+cancelFormBtn.addEventListener("click", discardForm);
 
 if (config) {
   supabase = window.supabase.createClient(config.url, config.key);
