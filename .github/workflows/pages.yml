@@ -9,17 +9,36 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
+  detect-runner:
+    runs-on: ubuntu-latest
+    outputs:
+      runner: ${{ steps.detect.outputs.runner }}
+    steps:
+      - id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=$(gh api repos/${{ github.repository }}/actions/runners \
+            --jq '.runners[] | select(.name == "wsl2-recipes") | .status' || true)
+          if [ "$status" = "online" ]; then
+            echo "runner=self-hosted" >> "$GITHUB_OUTPUT"
+          else
+            echo "runner=ubuntu-latest" >> "$GITHUB_OUTPUT"
+          fi
+
   deploy:
+    needs: detect-runner
+    runs-on: ${{ needs.detect-runner.outputs.runner }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
