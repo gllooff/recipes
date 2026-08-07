@@ -92,7 +92,7 @@ function setStatus(message, isError = false) {
 
 function formatDate(iso) {
   const d = new Date(iso);
-  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  return d.toLocaleDateString(I18N.get() === "zh" ? "zh-CN" : "en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
 function escapeHtml(s) {
