@@ -49,6 +49,8 @@ const recycleBinList = document.querySelector("#recycle-bin-list");
 const recycleBinCount = document.querySelector("#recycle-bin-count");
 const recycleBinRestoreAll = document.querySelector("#recycle-bin-restore-all");
 const recycleBinEmpty = document.querySelector("#recycle-bin-empty");
+const lightbox = document.querySelector("#lightbox");
+const lightboxClose = document.querySelector("#lightbox-close");
 
 let isAuthed = false;
 let isEditor = true;
@@ -800,6 +802,30 @@ recycleBinBtn.addEventListener("click", openRecycleBin);
 recycleBinClose.addEventListener("click", () => recycleBin.classList.add("hidden"));
 recycleBin.addEventListener("click", e => {
   if (e.target === recycleBin) recycleBin.classList.add("hidden");
+});
+
+function openLightbox(el) {
+  const clone = el.cloneNode(true);
+  clone.removeAttribute("loading");
+  lightbox.innerHTML = "";
+  lightbox.appendChild(clone);
+  lightbox.classList.remove("hidden");
+}
+
+function closeLightbox() {
+  lightbox.classList.add("hidden");
+  lightbox.innerHTML = "";
+}
+
+list.addEventListener("click", e => {
+  const media = e.target.closest(".media-item img, .media-item video");
+  if (media && media.closest("figure.media-item")) openLightbox(media);
+});
+lightbox.addEventListener("click", e => {
+  if (e.target === lightbox || e.target === lightboxClose) closeLightbox();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeLightbox();
 });
 
 recycleBinList.addEventListener("click", async e => {
