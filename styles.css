@@ -30,6 +30,17 @@ body {
 
 header { margin-bottom: 2rem; }
 
+.lang-toggle-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: .75rem;
+}
+
+.lang-toggle-row .lang-toggle {
+  padding: .3rem .7rem;
+  font-size: .82rem;
+}
+
 .header-actions {
   display: flex;
   justify-content: space-between;

@@ -1,21 +1,24 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Recipe Book</title>
+  <title data-i18n="ui.appTitle">食谱</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <section id="auth-screen" class="auth-screen hidden" aria-label="Sign in">
+  <section id="auth-screen" class="auth-screen hidden" aria-label="Sign in" data-i18n-aria-label="auth.signIn">
     <div class="auth-card">
-      <p class="eyebrow">Personal cookbook</p>
-      <h1>Recipe book</h1>
-      <p class="subtitle">Private — sign in to continue.</p>
+      <div class="lang-toggle-row">
+        <button type="button" class="secondary lang-toggle" data-lang-toggle>English</button>
+      </div>
+      <p class="eyebrow" data-i18n="ui.eyebrow">个人菜谱</p>
+      <h1 data-i18n="ui.appTitle">食谱</h1>
+      <p class="subtitle" data-i18n="ui.subtitleAuth">私人空间 — 登录后继续。</p>
       <form id="auth-form" class="auth-form">
-        <label>Email <input id="auth-email" type="email" required autocomplete="email"></label>
-        <label>Password <input id="auth-password" type="password" required autocomplete="current-password"></label>
-        <button type="submit">Sign in</button>
+        <label><span data-i18n="auth.email">邮箱</span> <input id="auth-email" type="email" required autocomplete="email"></label>
+        <label><span data-i18n="auth.password">密码</span> <input id="auth-password" type="password" required autocomplete="current-password"></label>
+        <button type="submit" data-i18n="auth.signIn">登录</button>
         <p id="auth-error" class="status error hidden" role="alert"></p>
       </form>
     </div>
@@ -23,27 +26,30 @@
 
   <main id="app" class="app">
     <header>
-      <p class="eyebrow">Personal cookbook</p>
-      <h1>Recipe book</h1>
-      <p class="subtitle">Record and browse your favourite dishes.</p>
+      <div class="lang-toggle-row">
+        <button type="button" class="secondary lang-toggle" data-lang-toggle>English</button>
+      </div>
+      <p class="eyebrow" data-i18n="ui.eyebrow">个人菜谱</p>
+      <h1 data-i18n="ui.appTitle">食谱</h1>
+      <p class="subtitle" data-i18n="ui.subtitleMain">记录并浏览你最喜欢的菜品。</p>
       <div class="header-actions">
-        <button type="button" id="logout" class="secondary logout hidden">Sign out</button>
-        <button type="button" id="add-recipe-toggle" class="logout hidden">Add a recipe</button>
-        <button type="button" id="refresh" class="logout hidden">Refresh</button>
+        <button type="button" id="logout" class="secondary logout hidden" data-i18n="header.signOut">退出登录</button>
+        <button type="button" id="add-recipe-toggle" class="logout hidden">添加菜谱</button>
+        <button type="button" id="refresh" class="logout hidden" data-i18n="header.refresh">刷新</button>
       </div>
     </header>
 
-    <section id="config-banner" class="config-banner hidden" aria-live="polite">
-      Not connected to a database. Put your Supabase URL and anon key in <code>config.js</code>.
+    <section id="config-banner" class="config-banner hidden" aria-live="polite" data-i18n-html="ui.configBanner">
+      未连接到数据库。请在 <code>config.js</code> 中填入 Supabase URL 和 anon 密钥。
     </section>
 
-    <section class="recipes" aria-label="Saved recipes">
+    <section class="recipes" aria-label="Saved recipes" data-i18n-aria-label="recipes.saved">
       <div class="recipes-header">
-        <h2>Saved recipes</h2>
+        <h2 data-i18n="recipes.saved">已保存的菜谱</h2>
         <div class="recipes-header-actions">
-          <input id="search" type="search" placeholder="Search recipes…" autocomplete="off" aria-label="Search recipes">
-          <button type="button" id="tag-filter-btn" class="secondary">Tags</button>
-          <button type="button" id="recycle-bin-btn" class="secondary recycle-bin-btn hidden" title="Recycle bin" aria-label="Open recycle bin">
+          <input id="search" type="search" placeholder="搜索菜谱…" autocomplete="off" aria-label="Search recipes" data-i18n-placeholder="recipes.search" data-i18n-aria-label="recipes.search">
+          <button type="button" id="tag-filter-btn" class="secondary" data-i18n="recipes.tags">标签</button>
+          <button type="button" id="recycle-bin-btn" class="secondary recycle-bin-btn hidden" title="Recycle bin" aria-label="Open recycle bin" data-i18n-title="bin.title" data-i18n-aria-label="bin.open">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M5.5 6h13"/>
               <path d="M6.5 6 7.4 18.8a2 2 0 0 0 2 2h5.2a2 2 0 0 0 2-2L17.5 6"/>
@@ -60,21 +66,21 @@
         </div>
       </div>
       <div id="tag-filter" class="tag-filter hidden" aria-live="polite">
-        <span class="tag-filter-label">Filter by:</span>
+        <span class="tag-filter-label" data-i18n="recipes.filterBy">按以下筛选：</span>
         <div id="tag-filter-chips" class="tag-chips"></div>
-        <button type="button" id="tag-filter-clear" class="secondary">Clear</button>
+        <button type="button" id="tag-filter-clear" class="secondary" data-i18n="recipes.clear">清除</button>
       </div>
       <div class="recipes-toolbar">
         <p id="count" class="count" aria-live="polite"></p>
-        <label class="sort">Sort
+        <label class="sort"><span data-i18n="recipes.sort">排序</span>
           <select id="sort">
-            <option value="created_at-desc" selected>Newest</option>
-            <option value="created_at-asc">Oldest</option>
-            <option value="title-asc">Name A–Z</option>
-            <option value="title-desc">Name Z–A</option>
+            <option value="created_at-desc" selected data-i18n="recipes.sortNewest">最新</option>
+            <option value="created_at-asc" data-i18n="recipes.sortOldest">最早</option>
+            <option value="title-asc" data-i18n="recipes.sortNameAz">名称 A–Z</option>
+            <option value="title-desc" data-i18n="recipes.sortNameZa">名称 Z–A</option>
           </select>
         </label>
-        <label class="page-size">Per page
+        <label class="page-size"><span data-i18n="recipes.perPage">每页</span>
           <select id="page-size">
             <option value="5" selected>5</option>
             <option value="10">10</option>
@@ -85,94 +91,95 @@
         </label>
       </div>
       <ul id="recipe-list" class="recipe-list"></ul>
-      <nav id="pagination" class="pagination hidden" aria-label="Recipe pages"></nav>
-      <p id="empty" class="empty hidden">No recipes yet. Add your first one above.</p>
+      <nav id="pagination" class="pagination hidden" aria-label="Recipe pages" data-i18n-aria-label="recipes.pages"></nav>
+      <p id="empty" class="empty hidden" data-i18n="recipes.empty">还没有菜谱，点击上方按钮添加第一个。</p>
       <p id="status" class="status" role="status"></p>
     </section>
 
-    <section id="add-recipe-section" class="controls hidden" aria-label="Add a recipe">
+    <section id="add-recipe-section" class="controls hidden" aria-label="Add a recipe" data-i18n-aria-label="form.add">
       <div class="add-recipe-panel">
         <div class="modal-header">
-          <h2>Add a recipe</h2>
+          <h2 data-i18n="form.add">添加菜谱</h2>
         </div>
         <form id="recipe-form" class="recipe-form">
-          <label>Title <input id="title" name="title" type="text" required placeholder="e.g. Butter chicken" autocomplete="off"></label>
-          <label>Notes <textarea id="notes" name="notes" rows="2" placeholder="Optional"></textarea></label>
+          <label><span data-i18n="form.title">标题</span> <input id="title" name="title" type="text" required placeholder="例如：咖喱鸡" autocomplete="off" data-i18n-placeholder="form.titlePlaceholder"></label>
+          <label><span data-i18n="form.notes">备注</span> <textarea id="notes" name="notes" rows="2" placeholder="可选" data-i18n-placeholder="form.optional"></textarea></label>
 
           <div class="form-group">
-            <h3>Tags</h3>
+            <h3 data-i18n="form.tags">标签</h3>
             <div id="tag-chips" class="tag-chips"></div>
-            <button type="button" id="tag-browse-btn" class="secondary">Browse tags</button>
+            <button type="button" id="tag-browse-btn" class="secondary" data-i18n="form.browseTags">浏览标签</button>
           </div>
 
           <div class="form-group">
-            <h3>Ingredients</h3>
+            <h3 data-i18n="form.ingredients">食材</h3>
             <div id="ingredients-editor" data-kind="ingredient"></div>
-            <button type="button" class="secondary add-row" data-kind="ingredient">+ Add ingredient</button>
+            <button type="button" class="secondary add-row" data-kind="ingredient" data-i18n="form.addIngredient">+ 添加食材</button>
           </div>
 
           <div class="form-group">
-            <h3>Steps</h3>
+            <h3 data-i18n="form.steps">步骤</h3>
             <div id="steps-editor" data-kind="step"></div>
-            <button type="button" class="secondary add-row" data-kind="step">+ Add step</button>
+            <button type="button" class="secondary add-row" data-kind="step" data-i18n="form.addStep">+ 添加步骤</button>
           </div>
 
           <div class="form-group">
-            <h3>Cookware</h3>
+            <h3 data-i18n="form.cookware">厨具</h3>
             <div id="cookware-editor" data-kind="cookware"></div>
-            <button type="button" class="secondary add-row" data-kind="cookware">+ Add cookware</button>
+            <button type="button" class="secondary add-row" data-kind="cookware" data-i18n="form.addCookware">+ 添加厨具</button>
           </div>
 
           <div class="form-group">
-            <h3>Recipe photos &amp; videos</h3>
+            <h3 data-i18n="form.media">菜谱照片和视频</h3>
             <div id="recipe-media-preview" class="media-previews"></div>
-            <label class="file-label">Add files
+            <label class="file-label"><span data-i18n="form.addFiles">添加文件</span>
               <input id="recipe-media" type="file" accept="image/*,video/*" multiple>
             </label>
           </div>
 
           <div class="actions">
-            <button type="submit">Save recipe</button>
-            <button type="button" id="cancel-form">Cancel</button>
+            <button type="submit" data-i18n="form.save">保存菜谱</button>
+            <button type="button" id="cancel-form" data-i18n="form.cancel">取消</button>
           </div>
         </form>
       </div>
     </section>
   </main>
 
-  <div id="recycle-bin" class="modal hidden" role="dialog" aria-modal="true" aria-label="Recycle bin">
+  <div id="recycle-bin" class="modal hidden" role="dialog" aria-modal="true" aria-label="Recycle bin" data-i18n-aria-label="bin.title">
     <div class="modal-panel recycle-bin-panel">
       <div class="modal-header">
-        <h2>Recycle bin</h2>
-        <button type="button" id="recycle-bin-close" class="secondary">Close</button>
+        <h2 data-i18n="bin.title">回收站</h2>
+        <button type="button" id="recycle-bin-close" class="secondary" data-i18n="ui.close">关闭</button>
       </div>
       <p id="recycle-bin-count" class="count"></p>
       <ul id="recycle-bin-list" class="recycle-bin-list"></ul>
       <div class="modal-actions">
-        <button type="button" id="recycle-bin-restore-all" class="secondary">Restore all</button>
-        <button type="button" id="recycle-bin-empty" class="danger">Empty bin</button>
+        <button type="button" id="recycle-bin-restore-all" class="secondary" data-i18n="bin.restoreAll">全部恢复</button>
+        <button type="button" id="recycle-bin-empty" class="danger" data-i18n="bin.emptyBin">清空回收站</button>
       </div>
     </div>
   </div>
-  <div id="tag-picker" class="modal hidden" role="dialog" aria-modal="true" aria-label="Choose tags">
+  <div id="tag-picker" class="modal hidden" role="dialog" aria-modal="true" aria-label="Choose tags" data-i18n-aria-label="tags.choose">
     <div class="modal-panel">
       <div class="modal-header">
-        <h2 id="tag-picker-title">Filter by tags</h2>
-        <button type="button" id="tag-picker-close" class="secondary">Close</button>
+        <h2 id="tag-picker-title">按标签筛选</h2>
+        <button type="button" id="tag-picker-close" class="secondary" data-i18n="ui.close">关闭</button>
       </div>
-      <input id="tag-picker-search" type="search" placeholder="Search tags…" autocomplete="off" aria-label="Search tags">
+      <input id="tag-picker-search" type="search" placeholder="搜索标签…" autocomplete="off" aria-label="Search tags" data-i18n-placeholder="tags.search" data-i18n-aria-label="tags.search">
       <div id="tag-picker-selected" class="tag-chips hidden"></div>
       <p id="tag-picker-count" class="count"></p>
       <ul id="tag-picker-list" class="tag-picker-list"></ul>
-      <nav id="tag-picker-pagination" class="pagination hidden" aria-label="Tag pages"></nav>
+      <nav id="tag-picker-pagination" class="pagination hidden" aria-label="Tag pages" data-i18n-aria-label="tags.pages"></nav>
       <div class="modal-actions">
         <button type="button" id="tag-picker-create" class="secondary hidden">+ Create tag</button>
-        <button type="button" id="tag-picker-apply">Apply</button>
+        <button type="button" id="tag-picker-apply" data-i18n="tags.apply">应用</button>
       </div>
     </div>
   </div>
-  <button type="button" id="back-to-top" class="back-to-top hidden" aria-label="Back to top">↑</button>
+  <button type="button" id="back-to-top" class="back-to-top hidden" aria-label="Back to top" data-i18n-aria-label="backToTop">↑</button>
   <script src="config.js"></script>
+  <script src="i18n.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="app.js"></script>
 </body>

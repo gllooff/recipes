@@ -1,3 +1,5 @@
+const t = window.I18N.t;
+
 const config = window.SUPABASE_URL && window.SUPABASE_ANON_KEY
   ? { url: window.SUPABASE_URL, key: window.SUPABASE_ANON_KEY }
   : null;
@@ -106,33 +108,33 @@ async function signedUrl(path) {
 // ---------- Row-based editors ----------
 
 function rowTemplate(kind, r = {}) {
-  const section = `<input class="row-section" placeholder="Section (optional)" value="${escapeHtml(r.section || "")}">`;
+  const section = `<input class="row-section" placeholder="${t("rows.section")}" value="${escapeHtml(r.section || "")}">`;
   const media = mediaPreviewHtml(r.media || []);
-  const file = `<label class="file-label">Add media <input class="row-file" type="file" accept="image/*,video/*" multiple></label>`;
+  const file = `<label class="file-label">${t("rows.addMedia")} <input class="row-file" type="file" accept="image/*,video/*" multiple></label>`;
   const actions = `
     <div class="row-actions">
-      <button type="button" class="secondary row-up" title="Move up">↑</button>
-      <button type="button" class="secondary row-down" title="Move down">↓</button>
-      <button type="button" class="danger row-remove" title="Remove">Remove</button>
+      <button type="button" class="secondary row-up" title="${t("rows.moveUp")}">↑</button>
+      <button type="button" class="secondary row-down" title="${t("rows.moveDown")}">↓</button>
+      <button type="button" class="danger row-remove" title="${t("rows.remove")}">${t("rows.remove")}</button>
     </div>`;
 
   if (kind === "ingredient") {
     return `<div class="row">${section}
-      <input class="row-amount" placeholder="Amount (e.g. 2 cloves)" value="${escapeHtml(r.amount || "")}">
-      <input class="row-name" placeholder="Ingredient (e.g. garlic)" value="${escapeHtml(r.name || "")}">
-      <input class="row-note" placeholder="Note (optional)" value="${escapeHtml(r.note || "")}">
+      <input class="row-amount" placeholder="${t("rows.amount")}" value="${escapeHtml(r.amount || "")}">
+      <input class="row-name" placeholder="${t("rows.ingredientName")}" value="${escapeHtml(r.name || "")}">
+      <input class="row-note" placeholder="${t("rows.note")}" value="${escapeHtml(r.note || "")}">
       ${media}${file}${actions}</div>`;
   }
   if (kind === "step") {
     return `<div class="row">${section}
-      <textarea class="row-text" placeholder="What to do" rows="2">${escapeHtml(r.text || "")}</textarea>
-      <input class="row-duration" type="number" min="0" placeholder="Minutes (optional)" value="${r.duration_min ?? ""}">
-      <input class="row-note" placeholder="Note (optional)" value="${escapeHtml(r.note || "")}">
+      <textarea class="row-text" placeholder="${t("rows.whatToDo")}" rows="2">${escapeHtml(r.text || "")}</textarea>
+      <input class="row-duration" type="number" min="0" placeholder="${t("rows.minutes")}" value="${r.duration_min ?? ""}">
+      <input class="row-note" placeholder="${t("rows.note")}" value="${escapeHtml(r.note || "")}">
       ${media}${file}${actions}</div>`;
   }
   return `<div class="row">
-    <input class="row-name" placeholder="Cookware (e.g. cast-iron skillet)" value="${escapeHtml(r.name || "")}">
-    <input class="row-note" placeholder="Note (optional)" value="${escapeHtml(r.note || "")}">
+    <input class="row-name" placeholder="${t("rows.cookwareName")}" value="${escapeHtml(r.name || "")}">
+    <input class="row-note" placeholder="${t("rows.note")}" value="${escapeHtml(r.note || "")}">
     ${media}${file}${actions}</div>`;
 }
 
@@ -199,7 +201,7 @@ function mediaPreviewHtml(items) {
       ${m.type === "video"
         ? `<video src="${escapeHtml(m.signedUrl)}" muted preload="metadata"></video>`
         : `<img src="${escapeHtml(m.signedUrl)}" alt="${escapeHtml(m.alt || "")}" loading="lazy">`}
-      <button type="button" class="remove-media" title="Remove">×</button>
+      <button type="button" class="remove-media" title="${t("rows.remove")}">×</button>
     </figure>`).join("");
 }
 
@@ -210,14 +212,14 @@ function populateEditor(kind, rows) {
 function populateForm(r) {
   form.title.value = r.title;
   form.notes.value = r.notes || "";
-  formTags = Array.isArray(r.meta_info?.tags) ? r.meta_info.tags.map(t => String(t)) : [];
+  formTags = Array.isArray(r.meta_info?.tags) ? r.meta_info.tags.map(tag => String(tag)) : [];
   renderFormTagChips();
   populateEditor("ingredient", r.ingredients);
   populateEditor("step", r.steps);
   populateEditor("cookware", r.cookware);
   recipeMediaPreview.innerHTML = mediaPreviewHtml(r.media || []);
   form.dataset.editingId = r.id;
-  form.querySelector("button[type=submit]").textContent = "Update recipe";
+  form.querySelector("button[type=submit]").textContent = t("form.update");
 }
 
 function resetForm() {
@@ -227,7 +229,7 @@ function resetForm() {
   recipeMediaPreview.innerHTML = "";
   formTags = [];
   renderFormTagChips();
-  form.querySelector("button[type=submit]").textContent = "Save recipe";
+  form.querySelector("button[type=submit]").textContent = t("form.save");
 }
 
 // ---------- Tags ----------
@@ -239,17 +241,17 @@ function normalizeTag(s) {
 async function loadTagNames() {
   if (!config || !isAuthed) return;
   const { data, error } = await supabase.from("tags").select("id, name");
-  if (!error) tagNames = new Map((data || []).map(t => [String(t.id), t.name]));
+  if (!error) tagNames = new Map((data || []).map(tag => [String(tag.id), tag.name]));
 }
 
 function renderTagChips(container, tags, onRemove) {
-  container.innerHTML = tags.map(t => {
-    const id = String(t);
+  container.innerHTML = tags.map(tag => {
+    const id = String(tag);
     const name = tagNames.get(id);
     if (!name) return "";
     return `
     <span class="tag-chip">${escapeHtml(name)}
-      <button type="button" class="tag-remove" data-tag="${escapeHtml(id)}" title="Remove tag">×</button>
+      <button type="button" class="tag-remove" data-tag="${escapeHtml(id)}" title="${t("rows.removeTag")}">×</button>
     </span>`;
   }).join("");
   container.querySelectorAll(".tag-remove").forEach(btn => {
@@ -305,14 +307,14 @@ function loadImage(file) {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not read image.")); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(t("status.readImageFailed"))); };
     img.src = url;
   });
 }
 
 function canvasToJpegBlob(canvas, quality) {
   return new Promise((resolve, reject) => {
-    canvas.toBlob(b => (b ? resolve(b) : reject(new Error("Could not encode image."))), "image/jpeg", quality);
+    canvas.toBlob(b => (b ? resolve(b) : reject(new Error(t("status.encodeImageFailed")))), "image/jpeg", quality);
   });
 }
 
@@ -359,7 +361,7 @@ async function uploadFile(file) {
   const ext = fileToUpload.type === "image/jpeg" ? "jpg" : (file.name.split(".").pop() || "").toLowerCase();
   const path = `${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from("recipe-media").upload(path, fileToUpload);
-  if (error) { setStatus(`Failed to upload ${file.name}: ${error.message}`, true); return null; }
+  if (error) { setStatus(t("status.uploadFailed", { name: file.name, msg: error.message }), true); return null; }
   return { path, type: isVideo ? "video" : "image", alt: file.name };
 }
 
@@ -373,7 +375,7 @@ async function saveEntities(kind, rows, recipeId, mediaInfo) {
         ? { recipe_id: recipeId, position, section: row.section, text: row.text, duration_min: row.duration_min, notes: row.note }
         : { recipe_id: recipeId, position, name: row.name, note: row.note };
     const { data, error } = await supabase.from(kind + "s").insert(record).select();
-    if (error) { setStatus(`Failed to save ${kind}: ${error.message}`, true); continue; }
+    if (error) { setStatus(t("status.saveKindFailed", { kind: t("entity." + kind), msg: error.message }), true); continue; }
     const entityId = data[0].id;
 
     const entries = [];
@@ -392,7 +394,7 @@ async function saveEntities(kind, rows, recipeId, mediaInfo) {
         : kind === "step" ? { step_id: entityId }
         : { cookware_id: entityId };
       const { error: mErr } = await supabase.from("media").insert({ ...target, type: m.type, path: m.path, alt: m.alt, sort_order: sort++ });
-      if (mErr) setStatus("Failed to save media info: " + mErr.message, true);
+      if (mErr) setStatus(t("status.saveMediaFailed", { msg: mErr.message }), true);
       else created.push(m.path);
     }
     position++;
@@ -402,21 +404,21 @@ async function saveEntities(kind, rows, recipeId, mediaInfo) {
 
 form.addEventListener("submit", async e => {
   e.preventDefault();
-  if (!config) { setStatus("Database not configured — see config.js", true); return; }
+  if (!config) { setStatus(t("status.notConfigured"), true); return; }
 
   const title = val(form.title);
-  if (!title) { setStatus("Title is required.", true); return; }
+  if (!title) { setStatus(t("status.titleRequired"), true); return; }
   const notes = val(form.notes) || null;
   const ingredientRows = readRows("ingredient");
   const stepRows = readRows("step");
   const cookwareRows = readRows("cookware");
-  for (const r of ingredientRows) if (!r.amount || !r.name) { setStatus("Each ingredient needs an amount and a name.", true); return; }
-  for (const r of stepRows) if (!r.text) { setStatus("Every step needs instructions.", true); return; }
-  for (const r of cookwareRows) if (!r.name) { setStatus("Every cookware item needs a name.", true); return; }
+  for (const r of ingredientRows) if (!r.amount || !r.name) { setStatus(t("status.ingredientRequired"), true); return; }
+  for (const r of stepRows) if (!r.text) { setStatus(t("status.stepRequired"), true); return; }
+  for (const r of cookwareRows) if (!r.name) { setStatus(t("status.cookwareRequired"), true); return; }
 
   const tags = [...formTags];
 
-  setStatus("Saving…");
+  setStatus(t("status.saving"));
   const editingId = form.dataset.editingId;
   const oldRecipe = editingId ? recipes.find(x => x.id === editingId) : null;
   const oldPaths = oldRecipe ? flatMedia(oldRecipe) : [];
@@ -425,10 +427,10 @@ form.addEventListener("submit", async e => {
   let recipeId = editingId;
   if (recipeId) {
     const { error } = await supabase.from("recipes").update({ title, notes, meta_info: { ...(oldRecipe?.meta_info || {}), tags } }).eq("id", recipeId);
-    if (error) { setStatus("Failed to save: " + error.message, true); return; }
+    if (error) { setStatus(t("status.saveFailed", { msg: error.message }), true); return; }
   } else {
     const { data, error } = await supabase.from("recipes").insert({ title, notes, meta_info: { tags } }).select();
-    if (error) { setStatus("Failed to save: " + error.message, true); return; }
+    if (error) { setStatus(t("status.saveFailed", { msg: error.message }), true); return; }
     recipeId = data[0].id;
   }
 
@@ -457,7 +459,7 @@ form.addEventListener("submit", async e => {
   let sort = 0;
   for (const m of recipeEntries) {
     const { error } = await supabase.from("media").insert({ recipe_id: recipeId, type: m.type, path: m.path, alt: m.alt, sort_order: sort++ });
-    if (error) { setStatus("Failed to save media info: " + error.message, true); continue; }
+    if (error) { setStatus(t("status.saveMediaFailed", { msg: error.message }), true); continue; }
     newPaths.add(m.path);
   }
 
@@ -466,7 +468,7 @@ form.addEventListener("submit", async e => {
 
   resetForm();
   closeAddRecipe();
-  setStatus(editingId ? "Recipe updated." : "Recipe saved.");
+  setStatus(editingId ? t("status.updated") : t("status.saved"));
   await load({ goToFirst: !editingId });
 });
 
@@ -517,7 +519,7 @@ function stepsList(items) {
         <span class="step-num">${n}</span>
         <div class="step-body">
           <p class="step-text">${escapeHtml(s.text)}</p>
-          ${s.duration_min ? `<p class="step-duration">${s.duration_min} min</p>` : ""}
+          ${s.duration_min ? `<p class="step-duration">${t("recipeDisplay.minutes", { n: s.duration_min })}</p>` : ""}
           ${s.note ? `<p class="step-note">${escapeHtml(s.note)}</p>` : ""}
           ${mediaInline(s.media)}
         </div>
@@ -529,7 +531,7 @@ function renderPagination(totalPages) {
   const pageBtn = n => `<button type="button" class="page-btn${n === currentPage ? " active" : ""}" data-page="${n}"${n === currentPage ? ' aria-current="page"' : ""}>${n}</button>`;
   const ellipsis = '<span class="page-ellipsis">…</span>';
   const buttons = [
-    `<button type="button" class="page-btn nav" data-page="${currentPage - 1}"${currentPage <= 1 ? " disabled" : ""}>Prev</button>`,
+    `<button type="button" class="page-btn nav" data-page="${currentPage - 1}"${currentPage <= 1 ? " disabled" : ""}>${t("pagination.prev")}</button>`,
   ];
   const windowStart = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
   const windowEnd = Math.min(totalPages, windowStart + 4);
@@ -543,15 +545,15 @@ function renderPagination(totalPages) {
     buttons.push(pageBtn(totalPages));
   }
   buttons.push(
-    `<button type="button" class="page-btn nav" data-page="${currentPage + 1}"${currentPage >= totalPages ? " disabled" : ""}>Next</button>`,
+    `<button type="button" class="page-btn nav" data-page="${currentPage + 1}"${currentPage >= totalPages ? " disabled" : ""}>${t("pagination.next")}</button>`,
   );
   paginationEl.innerHTML = buttons.join("");
 }
 
 function tagListFor(r) {
   const tags = Array.isArray(r.meta_info?.tags) ? r.meta_info.tags : [];
-  const chips = tags.map(t => {
-    const name = tagNames.get(String(t));
+  const chips = tags.map(tag => {
+    const name = tagNames.get(String(tag));
     return name ? `<span class="tag-chip static">${escapeHtml(name)}</span>` : "";
   }).join("");
   return chips ? `<p class="tag-list">${chips}</p>` : "";
@@ -564,26 +566,26 @@ function render() {
   const end = Number.isFinite(pageSize) ? Math.min(totalCount, start + pageSize) : totalCount;
 
   countEl.textContent = totalCount
-    ? `Showing ${start + 1}–${end} of ${totalCount} recipe${totalCount === 1 ? "" : "s"}`
-    : "No recipes";
+    ? t(totalCount === 1 ? "recipes.countShowing" : "recipes.countShowingMany", { start: start + 1, end, total: totalCount })
+    : t("recipes.noRecipes");
   emptyEl.classList.toggle("hidden", recipes.length > 0);
   paginationEl.classList.toggle("hidden", totalPages <= 1);
 
   list.innerHTML = recipes.map(r => `
     <li class="recipe" data-id="${r.id}">
       <h3>${escapeHtml(r.title)}</h3>
-      <p class="meta">Added ${formatDate(r.created_at)}</p>
+      <p class="meta">${t("recipeDisplay.added", { date: formatDate(r.created_at) })}</p>
       ${tagListFor(r)}
       ${mediaGallery(r.media)}
-      ${(r.ingredients || []).length ? `<section><h4>Ingredients</h4>${ingredientList(r.ingredients)}</section>` : ""}
-      ${(r.cookware || []).length ? `<section><h4>Cookware</h4>${cookwareList(r.cookware)}</section>` : ""}
-      ${(r.steps || []).length ? `<section><h4>Steps</h4>${stepsList(r.steps)}</section>` : ""}
+      ${(r.ingredients || []).length ? `<section><h4>${t("recipeDisplay.ingredients")}</h4>${ingredientList(r.ingredients)}</section>` : ""}
+      ${(r.cookware || []).length ? `<section><h4>${t("recipeDisplay.cookware")}</h4>${cookwareList(r.cookware)}</section>` : ""}
+      ${(r.steps || []).length ? `<section><h4>${t("recipeDisplay.steps")}</h4>${stepsList(r.steps)}</section>` : ""}
       ${r.notes ? `<p class="notes">${escapeHtml(r.notes)}</p>` : ""}
       <div class="actions">
-        <button type="button" class="secondary edit" data-id="${r.id}">Edit</button>
-        <button type="button" class="secondary add-tags" data-id="${r.id}">Add tags</button>
-        <button type="button" class="secondary add-images" data-id="${r.id}">Add images</button>
-        <button type="button" class="delete" data-id="${r.id}">Delete</button>
+        <button type="button" class="secondary edit" data-id="${r.id}">${t("recipeDisplay.edit")}</button>
+        <button type="button" class="secondary add-tags" data-id="${r.id}">${t("recipeDisplay.addTags")}</button>
+        <button type="button" class="secondary add-images" data-id="${r.id}">${t("recipeDisplay.addImages")}</button>
+        <button type="button" class="delete" data-id="${r.id}">${t("recipeDisplay.delete")}</button>
       </div>
       <input type="file" class="recipe-image-input" data-id="${r.id}" accept="image/*" multiple hidden>
     </li>`).join("");
@@ -613,7 +615,7 @@ async function load({ goToFirst = false } = {}) {
   if (!config || !isAuthed) return;
   if (goToFirst) currentPage = 1;
   const seq = ++loadSeq;
-  setStatus("Loading…");
+  setStatus(t("status.loading"));
   await loadTagNames();
   const q = searchInput.value.trim();
   const start = (currentPage - 1) * pageSize;
@@ -631,7 +633,7 @@ async function load({ goToFirst = false } = {}) {
 
   const [{ count, error: countError }, { data, error }] = await Promise.all([countQuery, dataQuery]);
   if (seq !== loadSeq) return;
-  if (countError || error) { setStatus("Failed to load recipes: " + (countError || error).message, true); return; }
+  if (countError || error) { setStatus(t("status.loadRecipesFailed", { msg: (countError || error).message }), true); return; }
 
   totalCount = count || 0;
   recipes = (data || []).map(r => ({
@@ -670,12 +672,12 @@ list.addEventListener("click", async e => {
   }
 
   if (btn.classList.contains("delete")) {
-    if (!r || !confirm(`Move "${r.title}" to the recycle bin? You can restore it later.`)) return;
-    setStatus("Moving to recycle bin…");
+    if (!r || !confirm(t("confirm.moveToBin", { title: r.title }))) return;
+    setStatus(t("status.movingToBin"));
     const { error } = await supabase.from("recipes")
       .update({ deleted_at: new Date().toISOString() }).eq("id", id);
-    if (error) { setStatus("Failed to delete: " + error.message, true); return; }
-    setStatus("Recipe moved to the recycle bin.");
+    if (error) { setStatus(t("status.deleteFailed", { msg: error.message }), true); return; }
+    setStatus(t("status.movedToBin"));
     await load();
     return;
   }
@@ -683,7 +685,7 @@ list.addEventListener("click", async e => {
   if (btn.classList.contains("edit") && r) {
     populateForm(r);
     openAddRecipe();
-    setStatus("Editing — make changes and save.");
+    setStatus(t("status.editing"));
     render();
   }
 });
@@ -697,15 +699,15 @@ list.addEventListener("change", async e => {
   input.value = "";
   const r = recipes.find(x => x.id === id);
   let sort = (r?.media || []).reduce((m, x) => Math.max(m, x.sort_order ?? 0), -1) + 1;
-  setStatus("Uploading…");
+  setStatus(t("status.uploading"));
   for (const file of files) {
     const up = await uploadFile(file);
     if (!up) continue;
     const { error } = await supabase.from("media").insert({ recipe_id: id, type: up.type, path: up.path, alt: up.alt, sort_order: sort++ });
-    if (error) { setStatus("Failed to add image: " + error.message, true); continue; }
+    if (error) { setStatus(t("status.addImageFailed", { msg: error.message }), true); continue; }
   }
   await load();
-  setStatus("Images added.");
+  setStatus(t("status.imagesAdded"));
 });
 
 searchInput.addEventListener("input", () => {
@@ -742,7 +744,7 @@ async function fetchFullRecipe(id) {
     .select("*, ingredients(*, media(*)), steps(*, media(*)), cookware(*, media(*)), media(*)")
     .eq("id", id)
     .single();
-  if (error) { setStatus("Failed to load recipe: " + error.message, true); return null; }
+  if (error) { setStatus(t("status.loadRecipeFailed", { msg: error.message }), true); return null; }
   data.ingredients = (data.ingredients || []).sort((a, b) => a.position - b.position);
   data.steps = (data.steps || []).sort((a, b) => a.position - b.position);
   data.cookware = (data.cookware || []).sort((a, b) => a.position - b.position);
@@ -758,15 +760,15 @@ async function removeRecipeMedia(id) {
 
 function renderRecycleBin() {
   recycleBinCount.textContent = binRecipes.length
-    ? `${binRecipes.length} recipe${binRecipes.length === 1 ? "" : "s"} in the bin`
-    : "The bin is empty";
+    ? t(binRecipes.length === 1 ? "bin.countOne" : "bin.count", { n: binRecipes.length })
+    : t("bin.empty");
   recycleBinList.innerHTML = binRecipes.map(r => `
     <li class="recycle-bin-item">
       <span class="bin-title">${escapeHtml(r.title)}</span>
-      <span class="bin-meta">Deleted ${escapeHtml(formatDate(r.deleted_at))}</span>
+      <span class="bin-meta">${t("bin.deleted", { date: formatDate(r.deleted_at) })}</span>
       <span class="bin-actions">
-        <button type="button" class="secondary bin-restore" data-id="${escapeHtml(r.id)}">Restore</button>
-        <button type="button" class="danger bin-prune" data-id="${escapeHtml(r.id)}" data-title="${escapeHtml(r.title)}">Prune</button>
+        <button type="button" class="secondary bin-restore" data-id="${escapeHtml(r.id)}">${t("bin.restore")}</button>
+        <button type="button" class="danger bin-prune" data-id="${escapeHtml(r.id)}" data-title="${escapeHtml(r.title)}">${t("bin.prune")}</button>
       </span>
     </li>`).join("");
   recycleBinRestoreAll.disabled = !binRecipes.length;
@@ -780,7 +782,7 @@ async function loadRecycleBin() {
     .select("id, title, created_at, deleted_at")
     .not("deleted_at", "is", null)
     .order("deleted_at", { ascending: false });
-  if (error) { setStatus("Failed to load recycle bin: " + error.message, true); return; }
+  if (error) { setStatus(t("status.loadBinFailed", { msg: error.message }), true); return; }
   binRecipes = data || [];
   renderRecycleBin();
 }
@@ -805,20 +807,20 @@ recycleBinList.addEventListener("click", async e => {
 
   if (btn.classList.contains("bin-restore")) {
     const { error } = await supabase.from("recipes").update({ deleted_at: null }).eq("id", id);
-    if (error) { setStatus("Failed to restore: " + error.message, true); return; }
-    setStatus(`"${r.title}" restored.`);
+    if (error) { setStatus(t("status.restoreFailed", { msg: error.message }), true); return; }
+    setStatus(t("bin.restored", { title: r.title }));
     loadRecycleBin();
     await load();
     return;
   }
 
   if (btn.classList.contains("bin-prune")) {
-    if (!confirm(`Permanently delete "${r.title}"? This cannot be undone and will also remove all its photos and videos.`)) return;
-    setStatus("Pruning…");
+    if (!confirm(t("confirm.prune", { title: r.title }))) return;
+    setStatus(t("status.pruning"));
     await removeRecipeMedia(id);
     const { error } = await supabase.from("recipes").delete().eq("id", id);
-    if (error) { setStatus("Failed to delete: " + error.message, true); return; }
-    setStatus(`"${r.title}" permanently deleted.`);
+    if (error) { setStatus(t("status.deleteFailed", { msg: error.message }), true); return; }
+    setStatus(t("bin.deletedForever", { title: r.title }));
     loadRecycleBin();
     await load();
   }
@@ -826,26 +828,26 @@ recycleBinList.addEventListener("click", async e => {
 
 recycleBinRestoreAll.addEventListener("click", async () => {
   if (!binRecipes.length) return;
-  if (!confirm(`Restore all ${binRecipes.length} recipe${binRecipes.length === 1 ? "" : "s"} from the recycle bin?`)) return;
-  setStatus("Restoring…");
+  if (!confirm(t("confirm.restoreAll", { n: binRecipes.length }))) return;
+  setStatus(t("status.restoring"));
   const { error } = await supabase.from("recipes")
     .update({ deleted_at: null }).not("deleted_at", "is", null);
-  if (error) { setStatus("Failed to restore: " + error.message, true); return; }
-  setStatus("Recycle bin restored.");
+  if (error) { setStatus(t("status.restoreFailed", { msg: error.message }), true); return; }
+  setStatus(t("status.binRestored"));
   loadRecycleBin();
   await load();
 });
 
 recycleBinEmpty.addEventListener("click", async () => {
   if (!binRecipes.length) return;
-  if (!confirm(`Empty the recycle bin? All ${binRecipes.length} recipe${binRecipes.length === 1 ? "" : "s"} and their photos and videos will be permanently deleted. This cannot be undone.`)) return;
-  setStatus("Emptying…");
+  if (!confirm(t("confirm.emptyBin", { n: binRecipes.length }))) return;
+  setStatus(t("status.emptying"));
   for (const r of binRecipes) await removeRecipeMedia(r.id);
   const { error } = await supabase.from("recipes").delete().not("deleted_at", "is", null);
-  if (error) { setStatus("Failed to empty bin: " + error.message, true); return; }
+  if (error) { setStatus(t("status.emptyBinFailed", { msg: error.message }), true); return; }
   binRecipes = [];
   renderRecycleBin();
-  setStatus("Recycle bin emptied.");
+  setStatus(t("status.binEmptied"));
   await load();
 });
 
@@ -855,7 +857,7 @@ function renderTagPickerPagination(totalPages) {
   const pageBtn = n => `<button type="button" class="page-btn${n === tagPickerPage ? " active" : ""}" data-page="${n}"${n === tagPickerPage ? ' aria-current="page"' : ""}>${n}</button>`;
   const ellipsis = '<span class="page-ellipsis">…</span>';
   const buttons = [
-    `<button type="button" class="page-btn nav" data-page="${tagPickerPage - 1}"${tagPickerPage <= 1 ? " disabled" : ""}>Prev</button>`,
+    `<button type="button" class="page-btn nav" data-page="${tagPickerPage - 1}"${tagPickerPage <= 1 ? " disabled" : ""}>${t("pagination.prev")}</button>`,
   ];
   const windowStart = Math.max(1, Math.min(tagPickerPage - 2, totalPages - 4));
   const windowEnd = Math.min(totalPages, windowStart + 4);
@@ -869,7 +871,7 @@ function renderTagPickerPagination(totalPages) {
     buttons.push(pageBtn(totalPages));
   }
   buttons.push(
-    `<button type="button" class="page-btn nav" data-page="${tagPickerPage + 1}"${tagPickerPage >= totalPages ? " disabled" : ""}>Next</button>`,
+    `<button type="button" class="page-btn nav" data-page="${tagPickerPage + 1}"${tagPickerPage >= totalPages ? " disabled" : ""}>${t("pagination.next")}</button>`,
   );
   tagPickerPagination.innerHTML = buttons.join("");
   tagPickerPagination.classList.toggle("hidden", totalPages <= 1);
@@ -884,7 +886,7 @@ async function loadTagPicker() {
   if (tagPickerTerm) query = query.ilike("name", `%${escapeLike(tagPickerTerm)}%`);
   const start = (tagPickerPage - 1) * TAG_PICKER_PAGE_SIZE;
   const { count, data, error } = await query.range(start, start + TAG_PICKER_PAGE_SIZE - 1);
-  if (error) { setStatus("Failed to load tags: " + error.message, true); return; }
+  if (error) { setStatus(t("status.loadTagsFailed", { msg: error.message }), true); return; }
   tagPickerTotal = count || 0;
   const totalPages = Math.max(1, Math.ceil(tagPickerTotal / TAG_PICKER_PAGE_SIZE));
   if (!(data || []).length && tagPickerPage > 1) {
@@ -892,18 +894,18 @@ async function loadTagPicker() {
     return loadTagPicker();
   }
   tagPickerCount.textContent = tagPickerTotal
-    ? `${tagPickerTotal} tag${tagPickerTotal === 1 ? "" : "s"}`
-    : "No tags";
-  const names = (data || []).map(t => t.name);
-  tagPickerList.innerHTML = (data || []).map(t => `
+    ? t(tagPickerTotal === 1 ? "tags.countOne" : "tags.count", { n: tagPickerTotal })
+    : t("tags.noTags");
+  const names = (data || []).map(tag => tag.name);
+  tagPickerList.innerHTML = (data || []).map(tag => `
     <li>
       <label class="tag-picker-item">
-        <input type="checkbox" data-tag="${escapeHtml(String(t.id))}"${tagPickerSelection.has(String(t.id)) ? " checked" : ""}>
-        <span class="tag-name">${escapeHtml(t.name)}</span>
-        <span class="tag-count">${t.recipe_count} recipe${t.recipe_count === 1 ? "" : "s"}</span>
+        <input type="checkbox" data-tag="${escapeHtml(String(tag.id))}"${tagPickerSelection.has(String(tag.id)) ? " checked" : ""}>
+        <span class="tag-name">${escapeHtml(tag.name)}</span>
+        <span class="tag-count">${t(tag.recipe_count === 1 ? "tags.recipeCountOne" : "tags.recipeCount", { n: tag.recipe_count })}</span>
         <span class="tag-actions">
-          <button type="button" class="tag-edit" data-tag-id="${escapeHtml(String(t.id))}" data-tag-name="${escapeHtml(t.name)}" title="Rename tag" aria-label="Rename tag">✎</button>
-          <button type="button" class="tag-delete" data-tag-id="${escapeHtml(String(t.id))}" data-tag-name="${escapeHtml(t.name)}" title="Delete tag" aria-label="Delete tag">✕</button>
+          <button type="button" class="tag-edit" data-tag-id="${escapeHtml(String(tag.id))}" data-tag-name="${escapeHtml(tag.name)}" title="${t("tags.rename")}" aria-label="${t("tags.rename")}">✎</button>
+          <button type="button" class="tag-delete" data-tag-id="${escapeHtml(String(tag.id))}" data-tag-name="${escapeHtml(tag.name)}" title="${t("tags.delete")}" aria-label="${t("tags.delete")}">✕</button>
         </span>
       </label>
     </li>`).join("");
@@ -933,20 +935,20 @@ function updateTagPickerCreate(names) {
   const selectedNames = [...tagPickerSelection].map(id => tagNames.get(String(id)) || "");
   const show = !!term && !exactMatch && !selectedNames.includes(term);
   tagPickerCreate.classList.toggle("hidden", !show);
-  if (show) tagPickerCreate.textContent = `+ Create tag “${tagPickerTerm.trim()}”`;
+  if (show) tagPickerCreate.textContent = t("tags.create", { term: tagPickerTerm.trim() });
 }
 
 function openTagPicker(mode, recipe = null) {
   tagPickerMode = mode;
   tagPickerRecipeId = recipe ? recipe.id : null;
   const initial = mode === "form" ? formTags
-    : mode === "recipe" ? (Array.isArray(recipe?.meta_info?.tags) ? recipe.meta_info.tags.map(t => String(t)) : [])
+    : mode === "recipe" ? (Array.isArray(recipe?.meta_info?.tags) ? recipe.meta_info.tags.map(tag => String(tag)) : [])
     : tagFilter;
   tagPickerSelection = new Set(initial);
   tagPickerTerm = "";
   tagPickerPage = 1;
   tagPickerSearch.value = "";
-  tagPickerTitle.textContent = mode === "form" ? "Add tags" : mode === "recipe" ? "Manage tags" : "Filter by tags";
+  tagPickerTitle.textContent = mode === "form" ? t("tags.addTags") : mode === "recipe" ? t("tags.manageTags") : t("tags.filterBy");
   renderTagPickerSelected();
   tagPicker.classList.remove("hidden");
   tagPickerSearch.focus();
@@ -977,9 +979,9 @@ tagPickerApply.addEventListener("click", async () => {
       .update({ meta_info: { ...(current?.meta_info || {}), tags: selected } })
       .eq("id", tagPickerRecipeId);
     tagPicker.classList.add("hidden");
-    if (error) { setStatus("Failed to save tags: " + error.message, true); return; }
+    if (error) { setStatus(t("status.saveTagsFailed", { msg: error.message }), true); return; }
     await load();
-    setStatus("Tags saved.");
+    setStatus(t("status.tagsSaved"));
     return;
   } else {
     tagFilter = selected;
@@ -994,7 +996,7 @@ tagPickerCreate.addEventListener("click", async () => {
   if (!tag) return;
   const { data, error } = await supabase.from("tags")
     .upsert([{ name: tag }], { onConflict: "name" }).select().single();
-  if (error) { setStatus("Failed to create tag: " + error.message, true); return; }
+  if (error) { setStatus(t("status.createTagFailed", { msg: error.message }), true); return; }
   tagNames.set(String(data.id), data.name);
   tagPickerSelection.add(String(data.id));
   syncTagPickerBoxes();
@@ -1042,37 +1044,37 @@ tagPickerList.addEventListener("click", e => {
 });
 
 async function renameTag(id, oldName) {
-  const input = prompt("Rename tag", oldName);
+  const input = prompt(t("tags.promptRename"), oldName);
   if (input === null) return;
   const name = normalizeTag(input);
-  if (!name) { setStatus("Tag name cannot be empty.", true); return; }
+  if (!name) { setStatus(t("status.tagNameEmpty"), true); return; }
   if (name === oldName) return;
   const { data: existing } = await supabase.from("tags").select("id").eq("name", name).maybeSingle();
-  if (existing) { setStatus("A tag with that name already exists.", true); return; }
+  if (existing) { setStatus(t("status.tagExists"), true); return; }
   const { error } = await supabase.from("tags").update({ name }).eq("id", id);
-  if (error) { setStatus("Failed to rename tag: " + error.message, true); return; }
+  if (error) { setStatus(t("status.renameTagFailed", { msg: error.message }), true); return; }
   tagNames.set(String(id), name);
   loadTagPicker();
   await load();
-  setStatus("Tag renamed.");
+  setStatus(t("status.tagRenamed"));
 }
 
 async function deleteTag(id, name) {
-  if (!confirm(`Delete tag "${name}"? It will no longer be shown on recipes.`)) return;
-  setStatus("Deleting tag…");
+  if (!confirm(t("confirm.deleteTag", { name }))) return;
+  setStatus(t("status.deletingTag"));
   const { error } = await supabase.from("tags").delete().eq("id", id);
-  if (error) { setStatus("Failed to delete tag: " + error.message, true); return; }
+  if (error) { setStatus(t("status.deleteTagFailed", { msg: error.message }), true); return; }
   tagNames.delete(String(id));
   tagPickerSelection.delete(String(id));
-  formTags = formTags.filter(t => String(t) !== String(id));
-  tagFilter = tagFilter.filter(t => String(t) !== String(id));
+  formTags = formTags.filter(tag => String(tag) !== String(id));
+  tagFilter = tagFilter.filter(tag => String(tag) !== String(id));
   syncTagPickerBoxes();
   renderTagPickerSelected();
   renderFormTagChips();
   renderTagFilterChips();
   loadTagPicker();
   await load();
-  setStatus("Tag deleted.");
+  setStatus(t("status.tagDeleted"));
 }
 tagPickerPagination.addEventListener("click", e => {
   const btn = e.target.closest("button[data-page]");
@@ -1142,14 +1144,14 @@ refreshBtn.addEventListener("click", () => load());
 
 function openAddRecipe() {
   addRecipeSection.classList.remove("hidden");
-  addRecipeToggle.textContent = "Close";
+  addRecipeToggle.textContent = t("header.close");
   form.querySelector("#title").focus();
 }
 
 function closeAddRecipe() {
   resetForm();
   addRecipeSection.classList.add("hidden");
-  addRecipeToggle.textContent = "Add a recipe";
+  addRecipeToggle.textContent = t("header.addRecipe");
 }
 
 function rowHasContent(row) {
@@ -1171,7 +1173,7 @@ function formIsEmpty() {
 }
 
 function discardForm() {
-  if (!formIsEmpty() && !confirm("Discard your edits?")) return;
+  if (!formIsEmpty() && !confirm(t("confirm.discard"))) return;
   closeAddRecipe();
   setStatus("");
 }
@@ -1186,6 +1188,17 @@ addRecipeSection.addEventListener("click", e => {
 });
 
 cancelFormBtn.addEventListener("click", discardForm);
+
+document.addEventListener("languagechange", () => {
+  if (isAuthed) load();
+  else render();
+  if (!addRecipeSection.classList.contains("hidden")) addRecipeToggle.textContent = t("header.close");
+  if (!recycleBin.classList.contains("hidden")) loadRecycleBin();
+  if (!tagPicker.classList.contains("hidden")) {
+    tagPickerTitle.textContent = tagPickerMode === "form" ? t("tags.addTags") : tagPickerMode === "recipe" ? t("tags.manageTags") : t("tags.filterBy");
+    loadTagPicker();
+  }
+});
 
 if (config) {
   supabase = window.supabase.createClient(config.url, config.key);
