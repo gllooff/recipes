@@ -51,6 +51,7 @@ const recycleBinRestoreAll = document.querySelector("#recycle-bin-restore-all");
 const recycleBinEmpty = document.querySelector("#recycle-bin-empty");
 
 let isAuthed = false;
+let isEditor = true;
 
 const editors = {
   ingredient: document.querySelector("#ingredients-editor"),
@@ -581,13 +582,15 @@ function render() {
       ${(r.cookware || []).length ? `<section><h4>${t("recipeDisplay.cookware")}</h4>${cookwareList(r.cookware)}</section>` : ""}
       ${(r.steps || []).length ? `<section><h4>${t("recipeDisplay.steps")}</h4>${stepsList(r.steps)}</section>` : ""}
       ${r.notes ? `<p class="notes">${escapeHtml(r.notes)}</p>` : ""}
-      <div class="actions">
-        <button type="button" class="secondary edit" data-id="${r.id}">${t("recipeDisplay.edit")}</button>
-        <button type="button" class="secondary add-tags" data-id="${r.id}">${t("recipeDisplay.addTags")}</button>
-        <button type="button" class="secondary add-images" data-id="${r.id}">${t("recipeDisplay.addImages")}</button>
-        <button type="button" class="delete" data-id="${r.id}">${t("recipeDisplay.delete")}</button>
-      </div>
-      <input type="file" class="recipe-image-input" data-id="${r.id}" accept="image/*" multiple hidden>
+      ${isEditor ? `
+        <div class="actions">
+          <button type="button" class="secondary edit" data-id="${r.id}">${t("recipeDisplay.edit")}</button>
+          <button type="button" class="secondary add-tags" data-id="${r.id}">${t("recipeDisplay.addTags")}</button>
+          <button type="button" class="secondary add-images" data-id="${r.id}">${t("recipeDisplay.addImages")}</button>
+          <button type="button" class="delete" data-id="${r.id}">${t("recipeDisplay.delete")}</button>
+        </div>
+        <input type="file" class="recipe-image-input" data-id="${r.id}" accept="image/*" multiple hidden>
+      ` : ""}
     </li>`).join("");
 
   renderPagination(totalPages);
@@ -788,6 +791,7 @@ async function loadRecycleBin() {
 }
 
 function openRecycleBin() {
+  if (!isEditor) return;
   recycleBin.classList.remove("hidden");
   loadRecycleBin();
 }
@@ -903,10 +907,12 @@ async function loadTagPicker() {
         <input type="checkbox" data-tag="${escapeHtml(String(tag.id))}"${tagPickerSelection.has(String(tag.id)) ? " checked" : ""}>
         <span class="tag-name">${escapeHtml(tag.name)}</span>
         <span class="tag-count">${t(tag.recipe_count === 1 ? "tags.recipeCountOne" : "tags.recipeCount", { n: tag.recipe_count })}</span>
+        ${isEditor ? `
         <span class="tag-actions">
           <button type="button" class="tag-edit" data-tag-id="${escapeHtml(String(tag.id))}" data-tag-name="${escapeHtml(tag.name)}" title="${t("tags.rename")}" aria-label="${t("tags.rename")}">✎</button>
           <button type="button" class="tag-delete" data-tag-id="${escapeHtml(String(tag.id))}" data-tag-name="${escapeHtml(tag.name)}" title="${t("tags.delete")}" aria-label="${t("tags.delete")}">✕</button>
         </span>
+        ` : ""}
       </label>
     </li>`).join("");
   renderTagPickerPagination(totalPages);
@@ -930,6 +936,7 @@ function syncTagPickerBoxes() {
 }
 
 function updateTagPickerCreate(names) {
+  if (!isEditor) { tagPickerCreate.classList.add("hidden"); return; }
   const term = normalizeTag(tagPickerTerm);
   const exactMatch = (names || []).some(n => n === term);
   const selectedNames = [...tagPickerSelection].map(id => tagNames.get(String(id)) || "");
@@ -1109,10 +1116,12 @@ function showApp() {
 
 function applySession(session) {
   isAuthed = !!session;
+  isEditor = !session || session.user?.app_metadata?.app_role !== "viewer";
   logoutBtn.classList.toggle("hidden", !session);
   refreshBtn.classList.toggle("hidden", !session);
-  addRecipeToggle.classList.toggle("hidden", !session);
-  recycleBinBtn.classList.toggle("hidden", !session);
+  addRecipeToggle.classList.toggle("hidden", !session || !isEditor);
+  recycleBinBtn.classList.toggle("hidden", !session || !isEditor);
+  if (!isAuthed || !isEditor) addRecipeSection.classList.add("hidden");
   if (session) {
     showApp();
     load();
@@ -1143,6 +1152,7 @@ logoutBtn.addEventListener("click", async () => {
 refreshBtn.addEventListener("click", () => load());
 
 function openAddRecipe() {
+  if (!isEditor) return;
   addRecipeSection.classList.remove("hidden");
   addRecipeToggle.textContent = t("header.close");
   form.querySelector("#title").focus();
