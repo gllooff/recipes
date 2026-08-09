@@ -103,6 +103,15 @@
         </div>
         <form id="recipe-form" class="recipe-form">
           <label><span data-i18n="form.title">标题</span> <input id="title" name="title" type="text" required placeholder="例如：咖喱鸡" autocomplete="off" data-i18n-placeholder="form.titlePlaceholder"></label>
+
+          <div class="form-group">
+            <h3 data-i18n="form.media">菜谱照片和视频</h3>
+            <div id="recipe-media-preview" class="media-previews"></div>
+            <label class="file-label"><span data-i18n="form.addFiles">添加文件</span>
+              <input id="recipe-media" type="file" accept="image/*,video/*" multiple>
+            </label>
+          </div>
+
           <label><span data-i18n="form.notes">备注</span> <textarea id="notes" name="notes" rows="2" placeholder="可选" data-i18n-placeholder="form.optional"></textarea></label>
 
           <div class="form-group">
@@ -127,14 +136,6 @@
             <h3 data-i18n="form.cookware">厨具</h3>
             <div id="cookware-editor" data-kind="cookware"></div>
             <button type="button" class="secondary add-row" data-kind="cookware" data-i18n="form.addCookware">+ 添加厨具</button>
-          </div>
-
-          <div class="form-group">
-            <h3 data-i18n="form.media">菜谱照片和视频</h3>
-            <div id="recipe-media-preview" class="media-previews"></div>
-            <label class="file-label"><span data-i18n="form.addFiles">添加文件</span>
-              <input id="recipe-media" type="file" accept="image/*,video/*" multiple>
-            </label>
           </div>
 
           <div class="actions">
