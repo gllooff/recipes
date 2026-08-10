@@ -267,7 +267,29 @@ button.danger:hover { border-color: var(--danger); }
   font: inherit;
 }
 
-#search { width: 180px; }
+.search-wrap { position: relative; }
+
+#search { width: 180px; padding-right: 26px; }
+#search::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+
+.search-clear {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.search-clear:hover { color: var(--foreground); background: var(--surface-hover); }
 
 .count { color: var(--muted); font-size: .85rem; margin: .5rem 0 1rem; }
 
@@ -684,6 +706,7 @@ html { -webkit-text-size-adjust: 100%; }
 
   .recipes-header { flex-wrap: wrap; gap: .6rem; }
   .recipes-header-actions { width: 100%; }
+  .search-wrap { width: 100%; }
   #search { width: 100%; }
 
   .recipes-toolbar { flex-wrap: wrap; gap: .5rem; }

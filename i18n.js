@@ -25,6 +25,7 @@ window.I18N = (function () {
       recipes: {
         saved: "Saved recipes",
         search: "Search recipes…",
+        clearSearch: "Clear search",
         tags: "Tags",
         filterBy: "Filter by:",
         clear: "Clear",
@@ -204,6 +205,7 @@ window.I18N = (function () {
       recipes: {
         saved: "已保存的菜谱",
         search: "搜索菜谱…",
+        clearSearch: "清除搜索",
         tags: "标签",
         filterBy: "按以下筛选：",
         clear: "清除",

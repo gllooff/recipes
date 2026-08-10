@@ -47,7 +47,15 @@
       <div class="recipes-header">
         <h2 data-i18n="recipes.saved">已保存的菜谱</h2>
         <div class="recipes-header-actions">
-          <input id="search" type="search" placeholder="搜索菜谱…" autocomplete="off" aria-label="Search recipes" data-i18n-placeholder="recipes.search" data-i18n-aria-label="recipes.search">
+          <div class="search-wrap">
+            <input id="search" type="search" placeholder="搜索菜谱…" autocomplete="off" aria-label="Search recipes" data-i18n-placeholder="recipes.search" data-i18n-aria-label="recipes.search">
+            <button type="button" id="search-clear" class="search-clear hidden" title="Clear search" aria-label="Clear search" data-i18n-title="recipes.clearSearch" data-i18n-aria-label="recipes.clearSearch">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <path d="M18 6 6 18"/>
+                <path d="m6 6 12 12"/>
+              </svg>
+            </button>
+          </div>
           <button type="button" id="tag-filter-btn" class="secondary" data-i18n="recipes.tags">标签</button>
           <button type="button" id="recycle-bin-btn" class="secondary recycle-bin-btn hidden" title="Recycle bin" aria-label="Open recycle bin" data-i18n-title="bin.title" data-i18n-aria-label="bin.open">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

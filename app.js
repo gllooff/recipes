@@ -7,6 +7,7 @@ const config = window.SUPABASE_URL && window.SUPABASE_ANON_KEY
 const form = document.querySelector("#recipe-form");
 const cancelFormBtn = document.querySelector("#cancel-form");
 const searchInput = document.querySelector("#search");
+const searchClear = document.querySelector("#search-clear");
 const list = document.querySelector("#recipe-list");
 const countEl = document.querySelector("#count");
 const emptyEl = document.querySelector("#empty");
@@ -716,8 +717,18 @@ list.addEventListener("change", async e => {
 });
 
 searchInput.addEventListener("input", () => {
+  searchClear.classList.toggle("hidden", searchInput.value.length === 0);
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => { currentPage = 1; load(); }, 300);
+});
+
+searchClear.addEventListener("click", () => {
+  searchInput.value = "";
+  searchClear.classList.add("hidden");
+  searchInput.focus();
+  clearTimeout(searchTimer);
+  currentPage = 1;
+  load();
 });
 
 pageSizeSelect.addEventListener("change", () => {
