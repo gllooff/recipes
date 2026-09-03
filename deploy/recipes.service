@@ -1,0 +1,27 @@
+[Unit]
+Description=recipes server (personal cookbook)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=recipes
+Group=recipes
+WorkingDirectory=/opt/recipes
+EnvironmentFile=/opt/recipes/.env
+ExecStart=/opt/recipes/recipes
+Restart=on-failure
+RestartSec=3
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/recipes/data
+
+# TLS is terminated by Caddy (/etc/caddy/Caddyfile); recipes is plain HTTP on
+# the loopback port 8082 only.
+
+[Install]
+WantedBy=multi-user.target

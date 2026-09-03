@@ -9,7 +9,6 @@ window.I18N = (function () {
         subtitleAuth: "Private — sign in to continue.",
         subtitleMain: "Record and browse your favourite dishes.",
         close: "Close",
-        configBanner: 'Not connected to a database. Put your Supabase URL and anon key in <code>config.js</code>.',
       },
       auth: {
         email: "Email",
@@ -189,7 +188,6 @@ window.I18N = (function () {
         subtitleAuth: "私人空间 — 登录后继续。",
         subtitleMain: "记录并浏览你最喜欢的菜品。",
         close: "关闭",
-        configBanner: '未连接到数据库。请在 <code>config.js</code> 中填入 Supabase URL 和 anon 密钥。',
       },
       auth: {
         email: "邮箱",

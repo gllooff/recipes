@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      # Host port 8090 -> container 8080. Override with PORT=... .
+      - "${PORT:-8090}:8080"
+    environment:
+      # Local plain-HTTP testing: Secure cookies would break on http://localhost.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    volumes:
+      # SQLite database and media files live in ./data (built by cmd/migrate).
+      - ./data:/data
+      # Bind-mount the frontend for live editing during development.
+      - ./web:/app/web
+    restart: unless-stopped

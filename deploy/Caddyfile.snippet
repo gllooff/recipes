@@ -1,0 +1,5 @@
+# recipe.jys-reality.win -- plain HTTP backend on 127.0.0.1:8082.
+# Append to /etc/caddy/Caddyfile on the Droplet and run: systemctl reload caddy
+recipe.jys-reality.win {
+	reverse_proxy 127.0.0.1:8082
+}

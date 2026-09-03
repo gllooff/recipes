@@ -1,8 +1,20 @@
 const t = window.I18N.t;
 
-const config = window.SUPABASE_URL && window.SUPABASE_ANON_KEY
-  ? { url: window.SUPABASE_URL, key: window.SUPABASE_ANON_KEY }
-  : null;
+// Small fetch wrapper around the backend API. All paths are relative to /api.
+async function api(path, opts = {}) {
+  const res = await fetch("/api" + path, {
+    method: opts.method || "GET",
+    headers: opts.body ? { "Content-Type": "application/json" } : undefined,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const b = await res.json(); if (b && b.error) msg = b.error; } catch (err) {}
+    throw new Error(msg);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
 
 const form = document.querySelector("#recipe-form");
 const cancelFormBtn = document.querySelector("#cancel-form");
@@ -12,7 +24,6 @@ const list = document.querySelector("#recipe-list");
 const countEl = document.querySelector("#count");
 const emptyEl = document.querySelector("#empty");
 const statusEl = document.querySelector("#status");
-const banner = document.querySelector("#config-banner");
 const pageSizeSelect = document.querySelector("#page-size");
 const sortSelect = document.querySelector("#sort");
 const paginationEl = document.querySelector("#pagination");
@@ -104,9 +115,10 @@ function val(input) {
   return input ? input.value.trim() : "";
 }
 
-async function signedUrl(path) {
-  const { data } = await supabase.storage.from("recipe-media").createSignedUrl(path, 3600);
-  return data ? data.signedUrl : "";
+// Media files live on the backend's disk and are served (session-gated) from
+// /media/file/{path}; a stored path is immutable, so URLs never expire.
+function mediaUrl(path) {
+  return "/media/file/" + encodeURIComponent(path);
 }
 
 // ---------- Row-based editors ----------
@@ -172,6 +184,7 @@ function readRows(kind) {
     const base = {
       files: Array.from(row.querySelector(".row-file").files),
       keptPaths: Array.from(row.querySelectorAll(".media-preview")).map(p => p.dataset.path),
+      media: [],
     };
     if (kind === "ingredient") {
       return {
@@ -200,11 +213,11 @@ function readRows(kind) {
 }
 
 function mediaPreviewHtml(items) {
-  return items.map(m => `
+  return (items || []).map(m => `
     <figure class="media-preview" data-path="${escapeHtml(m.path)}">
       ${m.type === "video"
-        ? `<video src="${escapeHtml(m.signedUrl)}" muted preload="metadata"></video>`
-        : `<img src="${escapeHtml(m.signedUrl)}" alt="${escapeHtml(m.alt || "")}" loading="lazy">`}
+        ? `<video src="${escapeHtml(m.url || mediaUrl(m.path))}" muted preload="metadata"></video>`
+        : `<img src="${escapeHtml(m.url || mediaUrl(m.path))}" alt="${escapeHtml(m.alt || "")}" loading="lazy">`}
       <button type="button" class="remove-media" title="${t("rows.remove")}">×</button>
     </figure>`).join("");
 }
@@ -243,9 +256,11 @@ function normalizeTag(s) {
 }
 
 async function loadTagNames() {
-  if (!config || !isAuthed) return;
-  const { data, error } = await supabase.from("tags").select("id, name");
-  if (!error) tagNames = new Map((data || []).map(tag => [String(tag.id), tag.name]));
+  if (!isAuthed) return;
+  try {
+    const body = await api("/tags?page_size=0");
+    tagNames = new Map((body.tags || []).map(tag => [String(tag.id), tag.name]));
+  } catch (err) { /* non-fatal: chips fall back to empty */ }
 }
 
 function renderTagChips(container, tags, onRemove) {
@@ -280,18 +295,7 @@ function renderTagFilterChips() {
   });
 }
 
-function applyTagFilter(query) {
-  return tagFilter.length ? query.contains("meta_info", { tags: tagFilter }) : query;
-}
-
 // ---------- Saving ----------
-
-function flatMedia(r) {
-  const out = (r.media || []).map(m => m.path);
-  [r.ingredients, r.steps, r.cookware].forEach(arr =>
-    (arr || []).forEach(x => (x.media || []).forEach(m => out.push(m.path))));
-  return out;
-}
 
 function mediaInfoFor(r) {
   const map = new Map();
@@ -305,6 +309,7 @@ function mediaInfoFor(r) {
 
 const MAX_IMAGE_BYTES = 200 * 1024;
 const TARGET_IMAGE_BYTES = 100 * 1024;
+const ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp", "gif", "mp4", "mov", "webm", "m4v"];
 
 function loadImage(file) {
   return new Promise((resolve, reject) => {
@@ -362,53 +367,49 @@ async function uploadFile(file) {
   const isVideo = file.type.startsWith("video/");
   if (!isVideo && !file.type.startsWith("image/")) return null;
   const fileToUpload = isVideo ? file : await compressImage(file).catch(() => file);
-  const ext = fileToUpload.type === "image/jpeg" ? "jpg" : (file.name.split(".").pop() || "").toLowerCase();
+  let ext = (file.name.split(".").pop() || "").toLowerCase();
+  if (fileToUpload.type === "image/jpeg") ext = "jpg";
+  if (!ALLOWED_EXTS.includes(ext)) {
+    setStatus(t("status.uploadFailed", { name: file.name, msg: t("status.unsupportedType") }), true);
+    return null;
+  }
   const path = `${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from("recipe-media").upload(path, fileToUpload);
-  if (error) { setStatus(t("status.uploadFailed", { name: file.name, msg: error.message }), true); return null; }
+  const fd = new FormData();
+  fd.append("file", fileToUpload, fileToUpload.name || file.name);
+  fd.append("path", path);
+  try {
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { const b = await res.json(); if (b && b.error) msg = b.error; } catch (err) {}
+      setStatus(t("status.uploadFailed", { name: file.name, msg }), true);
+      return null;
+    }
+  } catch (err) {
+    setStatus(t("status.uploadFailed", { name: file.name, msg: err.message }), true);
+    return null;
+  }
   return { path, type: isVideo ? "video" : "image", alt: file.name };
 }
 
-async function saveEntities(kind, rows, recipeId, mediaInfo) {
-  const created = [];
-  let position = 0;
+// Upload all pending files of a row list, filling row.media with the refs
+// that go into the recipe payload.
+async function uploadRowMedia(rows) {
   for (const row of rows) {
-    const record = kind === "ingredient"
-      ? { recipe_id: recipeId, position, section: row.section, amount: row.amount, name: row.name, note: row.note }
-      : kind === "step"
-        ? { recipe_id: recipeId, position, section: row.section, text: row.text, duration_min: row.duration_min, notes: row.note }
-        : { recipe_id: recipeId, position, name: row.name, note: row.note };
-    const { data, error } = await supabase.from(kind + "s").insert(record).select();
-    if (error) { setStatus(t("status.saveKindFailed", { kind: t("entity." + kind), msg: error.message }), true); continue; }
-    const entityId = data[0].id;
-
-    const entries = [];
+    row.media = [];
     for (const p of row.keptPaths) {
-      const info = mediaInfo.get(p);
-      if (info) entries.push({ path: p, ...info });
+      const info = row.mediaInfo.get(p);
+      if (info) row.media.push({ path: p, type: info.type, alt: info.alt });
     }
     for (const file of row.files) {
       const up = await uploadFile(file);
-      if (up) entries.push(up);
+      if (up) row.media.push(up);
     }
-
-    let sort = 0;
-    for (const m of entries) {
-      const target = kind === "ingredient" ? { ingredient_id: entityId }
-        : kind === "step" ? { step_id: entityId }
-        : { cookware_id: entityId };
-      const { error: mErr } = await supabase.from("media").insert({ ...target, type: m.type, path: m.path, alt: m.alt, sort_order: sort++ });
-      if (mErr) setStatus(t("status.saveMediaFailed", { msg: mErr.message }), true);
-      else created.push(m.path);
-    }
-    position++;
   }
-  return created;
 }
 
 form.addEventListener("submit", async e => {
   e.preventDefault();
-  if (!config) { setStatus(t("status.notConfigured"), true); return; }
 
   const title = val(form.title);
   if (!title) { setStatus(t("status.titleRequired"), true); return; }
@@ -420,55 +421,44 @@ form.addEventListener("submit", async e => {
   for (const r of stepRows) if (!r.text) { setStatus(t("status.stepRequired"), true); return; }
   for (const r of cookwareRows) if (!r.name) { setStatus(t("status.cookwareRequired"), true); return; }
 
-  const tags = [...formTags];
-
   setStatus(t("status.saving"));
   const editingId = form.dataset.editingId;
   const oldRecipe = editingId ? recipes.find(x => x.id === editingId) : null;
-  const oldPaths = oldRecipe ? flatMedia(oldRecipe) : [];
   const mediaInfo = oldRecipe ? mediaInfoFor(oldRecipe) : new Map();
+  for (const row of [...ingredientRows, ...stepRows, ...cookwareRows]) row.mediaInfo = mediaInfo;
 
-  let recipeId = editingId;
-  if (recipeId) {
-    const { error } = await supabase.from("recipes").update({ title, notes, meta_info: { ...(oldRecipe?.meta_info || {}), tags } }).eq("id", recipeId);
-    if (error) { setStatus(t("status.saveFailed", { msg: error.message }), true); return; }
-  } else {
-    const { data, error } = await supabase.from("recipes").insert({ title, notes, meta_info: { tags } }).select();
-    if (error) { setStatus(t("status.saveFailed", { msg: error.message }), true); return; }
-    recipeId = data[0].id;
-  }
+  // Upload every new file first; the recipe content is saved in one request.
+  await uploadRowMedia(ingredientRows);
+  await uploadRowMedia(stepRows);
+  await uploadRowMedia(cookwareRows);
 
-  if (editingId) {
-    await supabase.from("media").delete().eq("recipe_id", recipeId);
-    await supabase.from("ingredients").delete().eq("recipe_id", recipeId);
-    await supabase.from("steps").delete().eq("recipe_id", recipeId);
-    await supabase.from("cookware").delete().eq("recipe_id", recipeId);
-  }
-
-  const newPaths = new Set();
-  (await saveEntities("ingredient", ingredientRows, recipeId, mediaInfo)).forEach(p => newPaths.add(p));
-  (await saveEntities("step", stepRows, recipeId, mediaInfo)).forEach(p => newPaths.add(p));
-  (await saveEntities("cookware", cookwareRows, recipeId, mediaInfo)).forEach(p => newPaths.add(p));
-
-  const keptRecipe = Array.from(recipeMediaPreview.querySelectorAll(".media-preview")).map(p => p.dataset.path);
   const recipeEntries = [];
-  for (const p of keptRecipe) {
+  for (const p of Array.from(recipeMediaPreview.querySelectorAll(".media-preview")).map(x => x.dataset.path)) {
     const info = mediaInfo.get(p);
-    if (info) recipeEntries.push({ path: p, ...info });
+    if (info) recipeEntries.push({ path: p, type: info.type, alt: info.alt });
   }
   for (const file of Array.from(recipeMediaInput.files)) {
     const up = await uploadFile(file);
     if (up) recipeEntries.push(up);
   }
-  let sort = 0;
-  for (const m of recipeEntries) {
-    const { error } = await supabase.from("media").insert({ recipe_id: recipeId, type: m.type, path: m.path, alt: m.alt, sort_order: sort++ });
-    if (error) { setStatus(t("status.saveMediaFailed", { msg: error.message }), true); continue; }
-    newPaths.add(m.path);
-  }
 
-  const removed = oldPaths.filter(p => !newPaths.has(p));
-  if (removed.length) await supabase.storage.from("recipe-media").remove(removed);
+  const payload = {
+    title,
+    notes,
+    tags: [...formTags],
+    ingredients: ingredientRows.map(r => ({ section: r.section, amount: r.amount, name: r.name, note: r.note, media: r.media })),
+    steps: stepRows.map(r => ({ section: r.section, text: r.text, duration_min: r.duration_min, note: r.note, media: r.media })),
+    cookware: cookwareRows.map(r => ({ name: r.name, note: r.note, media: r.media })),
+    media: recipeEntries,
+  };
+
+  try {
+    if (editingId) await api(`/recipes/${editingId}`, { method: "PATCH", body: payload });
+    else await api("/recipes", { method: "POST", body: payload });
+  } catch (err) {
+    setStatus(t("status.saveFailed", { msg: err.message }), true);
+    return;
+  }
 
   resetForm();
   closeAddRecipe();
@@ -492,15 +482,15 @@ function groupBySection(items) {
 function mediaGallery(items) {
   if (!items || !items.length) return "";
   return `<div class="media-grid">${items.map(m => m.type === "video"
-    ? `<figure class="media-item"><video src="${escapeHtml(m.signedUrl)}" controls preload="metadata"></video></figure>`
-    : `<figure class="media-item"><img src="${escapeHtml(m.signedUrl)}" alt="${escapeHtml(m.alt || "")}" loading="lazy"></figure>`).join("")}</div>`;
+    ? `<figure class="media-item"><video src="${escapeHtml(m.url || mediaUrl(m.path))}" controls preload="metadata"></video></figure>`
+    : `<figure class="media-item"><img src="${escapeHtml(m.url || mediaUrl(m.path))}" alt="${escapeHtml(m.alt || "")}" loading="lazy"></figure>`).join("")}</div>`;
 }
 
 function mediaInline(items) {
   if (!items || !items.length) return "";
   return `<span class="media-inline">${items.map(m => m.type === "video"
-    ? `<video src="${escapeHtml(m.signedUrl)}" muted preload="metadata" title="${escapeHtml(m.alt || "")}"></video>`
-    : `<img src="${escapeHtml(m.signedUrl)}" alt="${escapeHtml(m.alt || "")}" loading="lazy">`).join("")}</span>`;
+    ? `<video src="${escapeHtml(m.url || mediaUrl(m.path))}" muted preload="metadata" title="${escapeHtml(m.alt || "")}"></video>`
+    : `<img src="${escapeHtml(m.url || mediaUrl(m.path))}" alt="${escapeHtml(m.alt || "")}" loading="lazy">`).join("")}</span>`;
 }
 
 function ingredientList(items) {
@@ -599,61 +589,35 @@ function render() {
   renderPagination(totalPages);
 }
 
-async function attachSignedUrls(r) {
-  const withUrl = async m => { m.signedUrl = await signedUrl(m.path); };
-  for (const m of r.media || []) await withUrl(m);
-  for (const arr of [r.ingredients, r.steps, r.cookware]) {
-    for (const item of arr || []) for (const m of item.media || []) await withUrl(m);
-  }
-}
-
-function escapeLike(term) {
-  return term.replace(/,/g, "%2C").replace(/\(/g, "%28").replace(/\)/g, "%29");
-}
-
-function applySearch(q, query) {
-  if (!q) return query;
-  const safe = escapeLike(q);
-  return query.or(`title.ilike.%${safe}%,notes.ilike.%${safe}%`);
-}
-
 async function load({ goToFirst = false } = {}) {
-  if (!config || !isAuthed) return;
+  if (!isAuthed) return;
   if (goToFirst) currentPage = 1;
   const seq = ++loadSeq;
   setStatus(t("status.loading"));
   await loadTagNames();
+  const params = new URLSearchParams();
   const q = searchInput.value.trim();
-  const start = (currentPage - 1) * pageSize;
-
-  const countQuery = applyTagFilter(applySearch(q, supabase
-    .from("recipes")
-    .select("id", { count: "exact", head: true })))
-    .is("deleted_at", null);
-  let dataQuery = applyTagFilter(applySearch(q, supabase
-    .from("recipes")
-    .select("*, ingredients(*, media(*)), steps(*, media(*)), cookware(*, media(*)), media(*)")
-    .order(sortColumn, { ascending: sortAscending })))
-    .is("deleted_at", null);
-  if (Number.isFinite(pageSize)) dataQuery = dataQuery.range(start, start + pageSize - 1);
-
-  const [{ count, error: countError }, { data, error }] = await Promise.all([countQuery, dataQuery]);
+  if (q) params.set("q", q);
+  params.set("sort", sortColumn);
+  params.set("dir", sortAscending ? "asc" : "desc");
+  params.set("page", String(currentPage));
+  params.set("page_size", pageSize === Number.MAX_SAFE_INTEGER ? "0" : String(pageSize));
+  if (tagFilter.length) params.set("tags", tagFilter.join(","));
+  let body;
+  try {
+    body = await api(`/recipes?${params.toString()}`);
+  } catch (err) {
+    if (seq === loadSeq) setStatus(t("status.loadRecipesFailed", { msg: err.message }), true);
+    return;
+  }
   if (seq !== loadSeq) return;
-  if (countError || error) { setStatus(t("status.loadRecipesFailed", { msg: (countError || error).message }), true); return; }
 
-  totalCount = count || 0;
-  recipes = (data || []).map(r => ({
-    ...r,
-    ingredients: (r.ingredients || []).sort((a, b) => a.position - b.position),
-    steps: (r.steps || []).sort((a, b) => a.position - b.position),
-    cookware: (r.cookware || []).sort((a, b) => a.position - b.position),
-    media: (r.media || []).sort((a, b) => a.sort_order - b.sort_order),
-  }));
+  totalCount = body.total || 0;
+  recipes = body.recipes || [];
   if (recipes.length === 0 && currentPage > 1 && totalCount > 0) {
     currentPage = Math.max(1, Math.ceil(totalCount / pageSize));
     return load();
   }
-  for (const r of recipes) await attachSignedUrls(r);
   render();
   setStatus("");
 }
@@ -680,10 +644,13 @@ list.addEventListener("click", async e => {
   if (btn.classList.contains("delete")) {
     if (!r || !confirm(t("confirm.moveToBin", { title: r.title }))) return;
     setStatus(t("status.movingToBin"));
-    const { error } = await supabase.from("recipes")
-      .update({ deleted_at: new Date().toISOString() }).eq("id", id);
-    if (error) { setStatus(t("status.deleteFailed", { msg: error.message }), true); return; }
-    setStatus(t("status.movedToBin"));
+    try {
+      await api(`/recipes/${id}`, { method: "DELETE" });
+      setStatus(t("status.movedToBin"));
+    } catch (err) {
+      setStatus(t("status.deleteFailed", { msg: err.message }), true);
+      return;
+    }
     await load();
     return;
   }
@@ -704,13 +671,19 @@ list.addEventListener("change", async e => {
   const files = Array.from(input.files);
   input.value = "";
   const r = recipes.find(x => x.id === id);
-  let sort = (r?.media || []).reduce((m, x) => Math.max(m, x.sort_order ?? 0), -1) + 1;
   setStatus(t("status.uploading"));
+  const entries = [];
   for (const file of files) {
     const up = await uploadFile(file);
-    if (!up) continue;
-    const { error } = await supabase.from("media").insert({ recipe_id: id, type: up.type, path: up.path, alt: up.alt, sort_order: sort++ });
-    if (error) { setStatus(t("status.addImageFailed", { msg: error.message }), true); continue; }
+    if (up) entries.push({ type: up.type, path: up.path, alt: up.alt });
+  }
+  if (entries.length) {
+    try {
+      await api(`/recipes/${id}/media`, { method: "POST", body: { media: entries } });
+    } catch (err) {
+      setStatus(t("status.addImageFailed", { msg: err.message }), true);
+      return;
+    }
   }
   await load();
   setStatus(t("status.imagesAdded"));
@@ -755,25 +728,6 @@ paginationEl.addEventListener("click", e => {
 
 // ---------- Recycle bin ----------
 
-async function fetchFullRecipe(id) {
-  const { data, error } = await supabase.from("recipes")
-    .select("*, ingredients(*, media(*)), steps(*, media(*)), cookware(*, media(*)), media(*)")
-    .eq("id", id)
-    .single();
-  if (error) { setStatus(t("status.loadRecipeFailed", { msg: error.message }), true); return null; }
-  data.ingredients = (data.ingredients || []).sort((a, b) => a.position - b.position);
-  data.steps = (data.steps || []).sort((a, b) => a.position - b.position);
-  data.cookware = (data.cookware || []).sort((a, b) => a.position - b.position);
-  data.media = (data.media || []).sort((a, b) => a.sort_order - b.sort_order);
-  return data;
-}
-
-async function removeRecipeMedia(id) {
-  const full = await fetchFullRecipe(id);
-  const paths = full ? flatMedia(full) : [];
-  if (paths.length) await supabase.storage.from("recipe-media").remove(paths);
-}
-
 function renderRecycleBin() {
   recycleBinCount.textContent = binRecipes.length
     ? t(binRecipes.length === 1 ? "bin.countOne" : "bin.count", { n: binRecipes.length })
@@ -792,14 +746,15 @@ function renderRecycleBin() {
 }
 
 async function loadRecycleBin() {
-  if (!config || !isAuthed) return;
-  const { data, error } = await supabase
-    .from("recipes")
-    .select("id, title, created_at, deleted_at")
-    .not("deleted_at", "is", null)
-    .order("deleted_at", { ascending: false });
-  if (error) { setStatus(t("status.loadBinFailed", { msg: error.message }), true); return; }
-  binRecipes = data || [];
+  if (!isAuthed) return;
+  let body;
+  try {
+    body = await api("/bin");
+  } catch (err) {
+    setStatus(t("status.loadBinFailed", { msg: err.message }), true);
+    return;
+  }
+  binRecipes = body.recipes || [];
   renderRecycleBin();
 }
 
@@ -847,8 +802,12 @@ recycleBinList.addEventListener("click", async e => {
   if (!r) return;
 
   if (btn.classList.contains("bin-restore")) {
-    const { error } = await supabase.from("recipes").update({ deleted_at: null }).eq("id", id);
-    if (error) { setStatus(t("status.restoreFailed", { msg: error.message }), true); return; }
+    try {
+      await api(`/recipes/${id}/restore`, { method: "POST" });
+    } catch (err) {
+      setStatus(t("status.restoreFailed", { msg: err.message }), true);
+      return;
+    }
     setStatus(t("bin.restored", { title: r.title }));
     loadRecycleBin();
     await load();
@@ -858,9 +817,13 @@ recycleBinList.addEventListener("click", async e => {
   if (btn.classList.contains("bin-prune")) {
     if (!confirm(t("confirm.prune", { title: r.title }))) return;
     setStatus(t("status.pruning"));
-    await removeRecipeMedia(id);
-    const { error } = await supabase.from("recipes").delete().eq("id", id);
-    if (error) { setStatus(t("status.deleteFailed", { msg: error.message }), true); return; }
+    try {
+      // The server removes the recipe row and its photos and videos.
+      await api(`/recipes/${id}/purge`, { method: "POST" });
+    } catch (err) {
+      setStatus(t("status.deleteFailed", { msg: err.message }), true);
+      return;
+    }
     setStatus(t("bin.deletedForever", { title: r.title }));
     loadRecycleBin();
     await load();
@@ -871,9 +834,12 @@ recycleBinRestoreAll.addEventListener("click", async () => {
   if (!binRecipes.length) return;
   if (!confirm(t("confirm.restoreAll", { n: binRecipes.length }))) return;
   setStatus(t("status.restoring"));
-  const { error } = await supabase.from("recipes")
-    .update({ deleted_at: null }).not("deleted_at", "is", null);
-  if (error) { setStatus(t("status.restoreFailed", { msg: error.message }), true); return; }
+  try {
+    await api("/bin/restore-all", { method: "POST" });
+  } catch (err) {
+    setStatus(t("status.restoreFailed", { msg: err.message }), true);
+    return;
+  }
   setStatus(t("status.binRestored"));
   loadRecycleBin();
   await load();
@@ -883,9 +849,12 @@ recycleBinEmpty.addEventListener("click", async () => {
   if (!binRecipes.length) return;
   if (!confirm(t("confirm.emptyBin", { n: binRecipes.length }))) return;
   setStatus(t("status.emptying"));
-  for (const r of binRecipes) await removeRecipeMedia(r.id);
-  const { error } = await supabase.from("recipes").delete().not("deleted_at", "is", null);
-  if (error) { setStatus(t("status.emptyBinFailed", { msg: error.message }), true); return; }
+  try {
+    await api("/bin/empty", { method: "POST" });
+  } catch (err) {
+    setStatus(t("status.emptyBinFailed", { msg: err.message }), true);
+    return;
+  }
   binRecipes = [];
   renderRecycleBin();
   setStatus(t("status.binEmptied"));
@@ -919,26 +888,29 @@ function renderTagPickerPagination(totalPages) {
 }
 
 async function loadTagPicker() {
-  if (!config || !isAuthed) return;
-  let query = supabase
-    .from("tag_stats")
-    .select("id, name, recipe_count", { count: "exact" })
-    .order("name", { ascending: true });
-  if (tagPickerTerm) query = query.ilike("name", `%${escapeLike(tagPickerTerm)}%`);
-  const start = (tagPickerPage - 1) * TAG_PICKER_PAGE_SIZE;
-  const { count, data, error } = await query.range(start, start + TAG_PICKER_PAGE_SIZE - 1);
-  if (error) { setStatus(t("status.loadTagsFailed", { msg: error.message }), true); return; }
-  tagPickerTotal = count || 0;
+  if (!isAuthed) return;
+  const params = new URLSearchParams();
+  if (tagPickerTerm) params.set("q", tagPickerTerm);
+  params.set("page", String(tagPickerPage));
+  params.set("page_size", String(TAG_PICKER_PAGE_SIZE));
+  let body;
+  try {
+    body = await api(`/tags?${params.toString()}`);
+  } catch (err) {
+    setStatus(t("status.loadTagsFailed", { msg: err.message }), true);
+    return;
+  }
+  tagPickerTotal = body.total || 0;
   const totalPages = Math.max(1, Math.ceil(tagPickerTotal / TAG_PICKER_PAGE_SIZE));
-  if (!(data || []).length && tagPickerPage > 1) {
+  if (!(body.tags || []).length && tagPickerPage > 1) {
     tagPickerPage = totalPages;
     return loadTagPicker();
   }
   tagPickerCount.textContent = tagPickerTotal
     ? t(tagPickerTotal === 1 ? "tags.countOne" : "tags.count", { n: tagPickerTotal })
     : t("tags.noTags");
-  const names = (data || []).map(tag => tag.name);
-  tagPickerList.innerHTML = (data || []).map(tag => `
+  const names = (body.tags || []).map(tag => tag.name);
+  tagPickerList.innerHTML = (body.tags || []).map(tag => `
     <li>
       <label class="tag-picker-item">
         <input type="checkbox" data-tag="${escapeHtml(String(tag.id))}"${tagPickerSelection.has(String(tag.id)) ? " checked" : ""}>
@@ -1018,12 +990,14 @@ tagPickerApply.addEventListener("click", async () => {
     formTags = selected;
     renderFormTagChips();
   } else if (tagPickerMode === "recipe") {
-    const current = recipes.find(x => x.id === tagPickerRecipeId);
-    const { error } = await supabase.from("recipes")
-      .update({ meta_info: { ...(current?.meta_info || {}), tags: selected } })
-      .eq("id", tagPickerRecipeId);
+    try {
+      await api(`/recipes/${tagPickerRecipeId}/tags`, { method: "PUT", body: { tags: selected } });
+    } catch (err) {
+      tagPicker.classList.add("hidden");
+      setStatus(t("status.saveTagsFailed", { msg: err.message }), true);
+      return;
+    }
     tagPicker.classList.add("hidden");
-    if (error) { setStatus(t("status.saveTagsFailed", { msg: error.message }), true); return; }
     await load();
     setStatus(t("status.tagsSaved"));
     return;
@@ -1038,11 +1012,15 @@ tagPickerApply.addEventListener("click", async () => {
 tagPickerCreate.addEventListener("click", async () => {
   const tag = normalizeTag(tagPickerTerm);
   if (!tag) return;
-  const { data, error } = await supabase.from("tags")
-    .upsert([{ name: tag }], { onConflict: "name" }).select().single();
-  if (error) { setStatus(t("status.createTagFailed", { msg: error.message }), true); return; }
-  tagNames.set(String(data.id), data.name);
-  tagPickerSelection.add(String(data.id));
+  let created;
+  try {
+    created = await api("/tags", { method: "POST", body: { name: tag } });
+  } catch (err) {
+    setStatus(t("status.createTagFailed", { msg: err.message }), true);
+    return;
+  }
+  tagNames.set(String(created.id), created.name);
+  tagPickerSelection.add(String(created.id));
   syncTagPickerBoxes();
   renderTagPickerSelected();
   updateTagPickerCreate();
@@ -1093,10 +1071,12 @@ async function renameTag(id, oldName) {
   const name = normalizeTag(input);
   if (!name) { setStatus(t("status.tagNameEmpty"), true); return; }
   if (name === oldName) return;
-  const { data: existing } = await supabase.from("tags").select("id").eq("name", name).maybeSingle();
-  if (existing) { setStatus(t("status.tagExists"), true); return; }
-  const { error } = await supabase.from("tags").update({ name }).eq("id", id);
-  if (error) { setStatus(t("status.renameTagFailed", { msg: error.message }), true); return; }
+  try {
+    await api(`/tags/${id}`, { method: "PATCH", body: { name } });
+  } catch (err) {
+    setStatus(t("status.renameTagFailed", { msg: err.message }), true);
+    return;
+  }
   tagNames.set(String(id), name);
   loadTagPicker();
   await load();
@@ -1106,8 +1086,12 @@ async function renameTag(id, oldName) {
 async function deleteTag(id, name) {
   if (!confirm(t("confirm.deleteTag", { name }))) return;
   setStatus(t("status.deletingTag"));
-  const { error } = await supabase.from("tags").delete().eq("id", id);
-  if (error) { setStatus(t("status.deleteTagFailed", { msg: error.message }), true); return; }
+  try {
+    await api(`/tags/${id}`, { method: "DELETE" });
+  } catch (err) {
+    setStatus(t("status.deleteTagFailed", { msg: err.message }), true);
+    return;
+  }
   tagNames.delete(String(id));
   tagPickerSelection.delete(String(id));
   formTags = formTags.filter(tag => String(tag) !== String(id));
@@ -1151,15 +1135,16 @@ function showApp() {
   appEl.classList.remove("hidden");
 }
 
-function applySession(session) {
-  isAuthed = !!session;
-  isEditor = !session || session.user?.app_metadata?.app_role !== "viewer";
-  logoutBtn.classList.toggle("hidden", !session);
-  refreshBtn.classList.toggle("hidden", !session);
-  addRecipeToggle.classList.toggle("hidden", !session || !isEditor);
-  recycleBinBtn.classList.toggle("hidden", !session || !isEditor);
+// user is {email, role} from the backend, or null when signed out.
+function applySession(user) {
+  isAuthed = !!user;
+  isEditor = !!user && user.role !== "viewer";
+  logoutBtn.classList.toggle("hidden", !user);
+  refreshBtn.classList.toggle("hidden", !user);
+  addRecipeToggle.classList.toggle("hidden", !user || !isEditor);
+  recycleBinBtn.classList.toggle("hidden", !user || !isEditor);
   if (!isAuthed || !isEditor) addRecipeSection.classList.add("hidden");
-  if (session) {
+  if (user) {
     showApp();
     load();
   } else {
@@ -1174,16 +1159,22 @@ function applySession(session) {
 authForm.addEventListener("submit", async e => {
   e.preventDefault();
   authError.classList.add("hidden");
-  const { error } = await supabase.auth.signInWithPassword({
-    email: authEmail.value.trim(),
-    password: authPassword.value,
-  });
-  if (error) { authError.textContent = error.message; authError.classList.remove("hidden"); return; }
-  authForm.reset();
+  try {
+    const user = await api("/auth/login", {
+      method: "POST",
+      body: { email: authEmail.value.trim(), password: authPassword.value },
+    });
+    authForm.reset();
+    applySession(user);
+  } catch (err) {
+    authError.textContent = err.message;
+    authError.classList.remove("hidden");
+  }
 });
 
 logoutBtn.addEventListener("click", async () => {
-  await supabase.auth.signOut();
+  try { await api("/auth/logout", { method: "POST" }); } catch (err) {}
+  applySession(null);
 });
 
 refreshBtn.addEventListener("click", () => load());
@@ -1247,14 +1238,7 @@ document.addEventListener("languagechange", () => {
   }
 });
 
-if (config) {
-  supabase = window.supabase.createClient(config.url, config.key);
-  supabase.auth.getSession().then(({ data }) => applySession(data.session));
-  supabase.auth.onAuthStateChange((_event, session) => applySession(session));
-} else {
-  banner.classList.remove("hidden");
-  showApp();
-  render();
-}
+// Bootstrap: ask the backend whether we already have a valid session cookie.
+api("/me").then(applySession).catch(() => applySession(null));
 
 load();

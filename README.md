@@ -1,113 +1,96 @@
 # Recipe Book
 
-A small personal cookbook hosted on GitHub Pages. A static frontend stores
-recipes in a Supabase (Postgres) database that the browser talks to directly.
+A small personal cookbook: Go backend with a SQLite database, plain
+HTML/CSS/JS frontend. Media files (photos and videos) live on the server's
+disk and are served by the backend. Originally a static GitHub Pages site
+backed by Supabase; the data (recipes, tags, media metadata, users with their
+bcrypt password hashes) and image files were migrated from Supabase, so
+existing accounts and recipes keep working unchanged.
 
-## Local development
+Deployed at https://recipe.jys-reality.win (DigitalOcean droplet, Caddy for
+TLS; the backend listens on loopback port 8082).
 
-Serve the folder over HTTP (the Supabase client requires `http(s)://`, so
-opening `index.html` directly from the filesystem will not work):
+## Layout
 
-```sh
-python3 -m http.server 8000
+```
+main.go, http.go        entrypoint
+cmd/migrate/            one-shot tool: builds the SQLite DB from a Supabase export
+internal/config/        env config (+ .env loading)
+internal/db/            SQLite connection + schema
+internal/auth/          bcrypt logins, session cookies (sha256-hashed tokens)
+internal/server/        REST handlers, static files, media serving
+web/                    frontend (vanilla JS, keep it dependency-free)
+deploy/                 systemd unit, Caddyfile snippet, deploy/setup scripts
+migrate-data/           Supabase export used by cmd/migrate (gitignored)
+data/                   recipes.db + media files (gitignored)
 ```
 
-Then open http://localhost:8000.
+## API
 
-## Setup
+All endpoints are session-cookie gated (`/api/auth/login` sets the cookie).
+Roles: `editor` (read/write) and `viewer` (read-only).
 
-1. Create a free account at https://supabase.com and start a new project.
-2. In the Supabase dashboard, open **SQL Editor** and run the contents of
-   `sql/schema.sql`. This creates six tables — `recipes`, `ingredients`,
-   `steps`, `cookware`, `media`, and `tags`. Ingredients, steps, and cookware
-   are ordered, optionally grouped into sections, and can each hold their own
-   photos/videos via the `media` table. Tags are stored on each recipe in its
-   `meta_info` JSON column as tag ids, with a `tags` registry table (and
-   `tag_stats` view showing each tag's recipe count) for browsing and
-   filtering. Storing ids means a tag can be renamed without touching recipes.
-   Deleting a recipe only sets its `deleted_at` column, moving it to the
-   recycle bin where it can be restored or permanently pruned. It also creates
-   a private `recipe-media` Storage bucket for the files (served through signed
-   URLs).
-   > If the project was set up with the older, open `anon` policies, run
-   > `sql/migrate_auth.sql` instead — it removes the anonymous access.
-   > If the project predates tags, run `sql/tags.sql` to add them.
-   > If tags already exist in the older name-based format, run
-   > `sql/migrate_tags_to_ids.sql` once to convert them to ids.
-   > If the project predates the recycle bin, run `sql/recycle_bin.sql` to add
-   > the soft-delete column and exclude trashed recipes from tag counts.
-3. Open **Project Settings -> API** and copy the **Project URL** and the
-   **anon public key**.
-4. Put both values into `config.js`:
-   ```js
-   window.SUPABASE_URL = "https://YOUR-PROJECT.supabase.co";
-   window.SUPABASE_ANON_KEY = "your-anon-key";
-   ```
+```
+POST   /api/auth/login            {email, password}
+POST   /api/auth/logout
+GET    /api/me
+GET    /api/recipes               ?q=&tags=id1,id2&sort=created_at|title&dir=asc|desc&page=&page_size=0
+POST   /api/recipes               full payload (title, notes, tags, ingredients, steps, cookware, media)
+GET    /api/recipes/{id}
+PATCH  /api/recipes/{id}          replaces content in one transaction
+DELETE /api/recipes/{id}          soft delete -> recycle bin
+POST   /api/recipes/{id}/restore
+POST   /api/recipes/{id}/purge    permanent delete incl. media files
+POST   /api/recipes/{id}/media    {media:[...]} attach already-uploaded files
+PUT    /api/recipes/{id}/tags     {tags:[...]} update tags only
+GET    /api/tags                  ?q=&page=&page_size= (page_size=0 -> all)
+POST   /api/tags                  {name} (normalized, upsert)
+PATCH  /api/tags/{id}             {name} rename
+DELETE /api/tags/{id}             also strips the id from recipes.meta_info
+GET    /api/bin                   recycle bin listing (editor only)
+POST   /api/bin/restore-all
+POST   /api/bin/empty             permanent delete of all binned recipes
+POST   /api/upload                multipart file upload (images/videos), returns {path,type,alt}
+GET    /media/file/{path}         serves a stored media file (session required)
+```
 
-> The anon key is meant to be public — it is only usable against the policies
-> you define. Row-level security is what keeps the data safe, so do not weaken
-> the policies in `schema.sql`.
+Media paths are `uuid.ext`; the server only ever serves/accepts names matching
+that pattern, and clients reference them as `/media/file/<path>` (no signed
+URLs to expire). Image compression to ~100 KB JPEG still happens client-side
+before upload.
 
-## Authentication
+## Local development (Docker Compose)
 
-The site is private. Nobody can read or write anything without signing in.
+```sh
+go run ./cmd/migrate -export ./migrate-data -db ./data/recipes.db -media ./data/media
+docker compose up --build
+```
 
-1. In the Supabase dashboard go to **Authentication -> Providers -> Email**
-   and turn **off** "Allow new users to sign up" (so nobody can create their
-   own account).
-2. Under **Authentication -> Users** click **Add user** and create your own
-   account (email + password). You may also want to turn off "Confirm email"
-   in **Providers -> Email** so you can sign in immediately.
-3. Open the site and sign in with those credentials. The session persists
-   until you sign out.
+Open http://localhost:8090. The compose file bind-mounts `./data` (database +
+media) and `./web`, and serves plain HTTP (`COOKIE_SECURE=false` by default
+there). Legacy accounts: the reader password is in `.env`; the editor account
+keeps the password it had on Supabase.
+
+Alternatively build/run natively (Go 1.26+):
+
+```sh
+go build -o recipes . && LISTEN_ADDR=127.0.0.1:8082 COOKIE_SECURE=false ./recipes
+```
 
 ## Deploying
 
-The GitHub Actions workflow (`.github/workflows/pages.yml`) publishes the
-`main` branch to GitHub Pages automatically. It also runs when you trigger it
-manually from the **Actions** tab.
+First-time Droplet setup (as root on the Droplet): create the `recipes` user
+and `/opt/recipes`, install `deploy/recipes.service` and `.env` (see
+`deploy/setup.sh`), append `deploy/Caddyfile.snippet` to
+`/etc/caddy/Caddyfile`, then `systemctl reload caddy`.
 
-1. Push this folder to your new repo on GitHub.
-2. In the repo, go to **Settings -> Pages** and set the source to
-   **GitHub Actions**.
-3. The site is served from `https://<user>.github.io/<repo-name>/`.
-
-Until `config.js` is filled in, the page shows a banner instead of connecting.
-
-## Troubleshooting: deployment stuck in "queued"
-
-If the workflow uses a self-hosted runner and a run sits in **queued/waiting**
-forever (even though **Settings -> Actions -> Runners** shows the runner as
-**online** and idle), the runner's job-message connection to GitHub has
-silently died. On runners inside WSL2/NAT this happens after network or sleep
-events: the long-lived socket to `broker.actions.githubusercontent.com` is
-dropped, so the runner still appears online (its token refresh keeps working)
-but it never receives new jobs.
-
-Symptoms:
-
-- `gh run list` shows the run as `queued`.
-- `gh api repos/<owner>/<repo>/actions/runs/<id>/jobs` returns
-  `"status":"waiting"` with `"runner_name":null`.
-- The runner's diagnostic log (`_diag/Runner_*.log`) contains
-  `SocketException (125): Operation canceled` from `BrokerServer`, followed by
-  no further broker activity.
-
-Fix — restart the runner service so it reconnects to the broker:
+Subsequent deploys, from the repo root on your machine:
 
 ```sh
-sudo systemctl restart actions.runner.<org>-<repo>.<runner-name>.service
+./deploy/deploy.sh               # build in Docker, upload binary + web, restart
+./deploy/deploy.sh --with-data   # also rsync data/ (recipes.db + media)
 ```
 
-Then confirm the runner is picking up jobs again:
-
-```sh
-gh run list --workflow "Deploy to GitHub Pages" --limit 3
-```
-
-The stuck run usually cannot be recovered; cancel it and trigger a fresh one:
-
-```sh
-gh run cancel <run-id>
-gh workflow run "Deploy to GitHub Pages"
-```
+The service runs as the `recipes` user on `127.0.0.1:8082`; Caddy terminates
+TLS for `recipe.jys-reality.win` and proxies to it. See `../rongbao_family_media`
+and `../jeye_travel` for the sibling services on the same Droplet.
