@@ -94,3 +94,15 @@ Subsequent deploys, from the repo root on your machine:
 The service runs as the `recipes` user on `127.0.0.1:8082`; Caddy terminates
 TLS for `recipe.jys-reality.win` and proxies to it. See `../rongbao_family_media`
 and `../jeye_travel` for the sibling services on the same Droplet.
+
+### Upgrading
+
+```bash
+# Cloud — single command after SSH-ing into the Droplet
+recipes-deploy               # pulls main, builds natively, installs, restarts, prints deployed commit
+# (the script lives in the repo at deploy/deploy-droplet.sh and is installed to /usr/local/bin/recipes-deploy;
+#  it pulls the repo clone at /home/recipes/recipes via a read-only GitHub deploy key)
+
+# Docker Compose — LOCAL REVIEW ONLY, never run on the Droplet
+docker compose up -d --build
+```
