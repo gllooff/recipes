@@ -373,7 +373,7 @@ async function uploadFile(file) {
     setStatus(t("status.uploadFailed", { name: file.name, msg: t("status.unsupportedType") }), true);
     return null;
   }
-  const path = `${crypto.randomUUID()}.${ext}`;
+  let path = `${crypto.randomUUID()}.${ext}`;
   const fd = new FormData();
   fd.append("file", fileToUpload, fileToUpload.name || file.name);
   fd.append("path", path);
@@ -385,6 +385,8 @@ async function uploadFile(file) {
       setStatus(t("status.uploadFailed", { name: file.name, msg }), true);
       return null;
     }
+    const saved = await res.json().catch(() => null);
+    if (saved && saved.path) path = saved.path;
   } catch (err) {
     setStatus(t("status.uploadFailed", { name: file.name, msg: err.message }), true);
     return null;

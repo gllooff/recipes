@@ -57,19 +57,13 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The client may propose its own uuid.ext path; otherwise generate one.
+	// The client proposes its own uuid.ext path and records that name, so it
+	// must be honored (an existing name is a re-upload: replace the file).
+	// Names are uuids, so a clash means the same logical file.
 	path := strings.TrimSpace(r.FormValue("path"))
-	if path != "" {
-		if !validMediaPath(path) {
-			writeError(w, http.StatusBadRequest, "invalid path field")
-			return
-		}
-		if _, err := os.Stat(s.cfg.MediaPath(path)); err == nil {
-			// Re-upload with an existing name: replace the stored file.
-			// (Names are uuids, so a clash means the same logical file.)
-		} else {
-			path = ""
-		}
+	if path != "" && !validMediaPath(path) {
+		writeError(w, http.StatusBadRequest, "invalid path field")
+		return
 	}
 	if path == "" {
 		path = newMediaName(ext)
