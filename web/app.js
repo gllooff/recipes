@@ -21,6 +21,7 @@ const cancelFormBtn = document.querySelector("#cancel-form");
 const searchInput = document.querySelector("#search");
 const searchClear = document.querySelector("#search-clear");
 const list = document.querySelector("#recipe-list");
+const layoutToggle = document.querySelector("#layout-toggle");
 const countEl = document.querySelector("#count");
 const emptyEl = document.querySelector("#empty");
 const statusEl = document.querySelector("#status");
@@ -75,8 +76,13 @@ const editors = {
 const recipeMediaInput = document.querySelector("#recipe-media");
 const recipeMediaPreview = document.querySelector("#recipe-media-preview");
 
+const LAYOUT_KEY = "recipe-book-layout";
+const PAGE_SIZE_DEFAULT = { list: 10, grid: 20 };
+let layout = "grid";
+try { if (localStorage.getItem(LAYOUT_KEY) === "list") layout = "list"; } catch (e) {}
+
 let recipes = [];
-let pageSize = 5;
+let pageSize = PAGE_SIZE_DEFAULT[layout];
 let currentPage = 1;
 let totalCount = 0;
 let sortColumn = "created_at";
@@ -555,6 +561,24 @@ function tagListFor(r) {
   return chips ? `<p class="tag-list">${chips}</p>` : "";
 }
 
+function applyLayout() {
+  const grid = layout === "grid";
+  list.classList.toggle("grid", grid);
+  layoutToggle.querySelector(".icon-grid").classList.toggle("hidden", grid);
+  layoutToggle.querySelector(".icon-list").classList.toggle("hidden", !grid);
+  const label = t(grid ? "recipes.viewList" : "recipes.viewGrid");
+  layoutToggle.title = label;
+  layoutToggle.setAttribute("aria-label", label);
+}
+
+function closeRecipeMenus() {
+  list.querySelectorAll(".recipe-menu.open").forEach(menu => {
+    menu.classList.remove("open");
+    const kebab = menu.querySelector(".kebab");
+    if (kebab) kebab.setAttribute("aria-expanded", "false");
+  });
+}
+
 function render() {
   const totalPages = Number.isFinite(pageSize) ? Math.max(1, Math.ceil(totalCount / pageSize)) : 1;
   currentPage = Math.min(currentPage, totalPages);
@@ -578,11 +602,20 @@ function render() {
       ${(r.steps || []).length ? `<section><h4>${t("recipeDisplay.steps")}</h4>${stepsList(r.steps)}</section>` : ""}
       ${r.notes ? `<p class="notes">${escapeHtml(r.notes)}</p>` : ""}
       ${isEditor ? `
-        <div class="actions">
-          <button type="button" class="secondary edit" data-id="${r.id}">${t("recipeDisplay.edit")}</button>
-          <button type="button" class="secondary add-tags" data-id="${r.id}">${t("recipeDisplay.addTags")}</button>
-          <button type="button" class="secondary add-images" data-id="${r.id}">${t("recipeDisplay.addImages")}</button>
-          <button type="button" class="delete" data-id="${r.id}">${t("recipeDisplay.delete")}</button>
+        <div class="recipe-menu">
+          <button type="button" class="kebab" data-id="${r.id}" aria-haspopup="true" aria-expanded="false" aria-label="${t("recipeDisplay.menu")}">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+              <circle cx="12" cy="5" r="1.7"/>
+              <circle cx="12" cy="12" r="1.7"/>
+              <circle cx="12" cy="19" r="1.7"/>
+            </svg>
+          </button>
+          <div class="actions">
+            <button type="button" class="secondary edit" data-id="${r.id}">${t("recipeDisplay.edit")}</button>
+            <button type="button" class="secondary add-tags" data-id="${r.id}">${t("recipeDisplay.addTags")}</button>
+            <button type="button" class="secondary add-images" data-id="${r.id}">${t("recipeDisplay.addImages")}</button>
+            <button type="button" class="delete" data-id="${r.id}">${t("recipeDisplay.delete")}</button>
+          </div>
         </div>
         <input type="file" class="recipe-image-input" data-id="${r.id}" accept="image/*" multiple hidden>
       ` : ""}
@@ -631,6 +664,19 @@ list.addEventListener("click", async e => {
   if (!btn) return;
   const id = btn.dataset.id;
   if (!id) return;
+
+  if (btn.classList.contains("kebab")) {
+    e.stopPropagation();
+    const menu = btn.closest(".recipe-menu");
+    const willOpen = !menu.classList.contains("open");
+    closeRecipeMenus();
+    if (willOpen) {
+      menu.classList.add("open");
+      btn.setAttribute("aria-expanded", "true");
+    }
+    return;
+  }
+
   const r = recipes.find(x => x.id === id);
 
   if (btn.classList.contains("add-tags")) {
@@ -720,6 +766,21 @@ sortSelect.addEventListener("change", () => {
   load();
 });
 
+layoutToggle.addEventListener("click", () => {
+  layout = layout === "grid" ? "list" : "grid";
+  try { localStorage.setItem(LAYOUT_KEY, layout); } catch (e) {}
+  pageSize = PAGE_SIZE_DEFAULT[layout];
+  pageSizeSelect.value = String(pageSize);
+  currentPage = 1;
+  closeRecipeMenus();
+  applyLayout();
+  load();
+});
+
+document.addEventListener("click", e => {
+  if (!e.target.closest(".recipe-menu")) closeRecipeMenus();
+});
+
 paginationEl.addEventListener("click", e => {
   const btn = e.target.closest("button[data-page]");
   if (!btn || btn.disabled) return;
@@ -793,7 +854,7 @@ lightbox.addEventListener("click", e => {
   if (e.target === lightbox || e.target === lightboxClose) closeLightbox();
 });
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape") closeLightbox();
+  if (e.key === "Escape") { closeLightbox(); closeRecipeMenus(); }
 });
 
 recycleBinList.addEventListener("click", async e => {
@@ -1230,6 +1291,7 @@ addRecipeSection.addEventListener("click", e => {
 cancelFormBtn.addEventListener("click", discardForm);
 
 document.addEventListener("languagechange", () => {
+  applyLayout();
   if (isAuthed) load();
   else render();
   if (!addRecipeSection.classList.contains("hidden")) addRecipeToggle.textContent = t("header.close");
@@ -1239,6 +1301,9 @@ document.addEventListener("languagechange", () => {
     loadTagPicker();
   }
 });
+
+pageSizeSelect.value = String(pageSize);
+applyLayout();
 
 // Bootstrap: ask the backend whether we already have a valid session cookie.
 api("/me").then(applySession).catch(() => applySession(null));

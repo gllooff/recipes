@@ -86,13 +86,25 @@
         </label>
         <label class="page-size"><span data-i18n="recipes.perPage">每页</span>
           <select id="page-size">
-            <option value="5" selected>5</option>
+            <option value="5">5</option>
             <option value="10">10</option>
-            <option value="20">20</option>
+            <option value="20" selected>20</option>
             <option value="40">40</option>
             <option value="0">∞</option>
           </select>
         </label>
+        <button type="button" id="layout-toggle" class="secondary layout-toggle" title="Switch to grid view" aria-label="Switch to grid view">
+          <svg class="icon-grid" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1"/>
+            <rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/>
+            <rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          <svg class="icon-list hidden" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/>
+            <path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>
+          </svg>
+        </button>
       </div>
       <ul id="recipe-list" class="recipe-list"></ul>
       <nav id="pagination" class="pagination hidden" aria-label="Recipe pages" data-i18n-aria-label="recipes.pages"></nav>

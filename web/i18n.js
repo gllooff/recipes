@@ -39,6 +39,8 @@ window.I18N = (function () {
         countShowing: "Showing {start}–{end} of {total} recipe",
         countShowingMany: "Showing {start}–{end} of {total} recipes",
         noRecipes: "No recipes",
+        viewGrid: "Switch to grid view",
+        viewList: "Switch to list view",
       },
       form: {
         add: "Add a recipe",
@@ -83,6 +85,7 @@ window.I18N = (function () {
         addTags: "Add tags",
         addImages: "Add images",
         delete: "Delete",
+        menu: "Recipe actions",
         minutes: "{n} min",
       },
       status: {
@@ -218,6 +221,8 @@ window.I18N = (function () {
         countShowing: "显示第 {start}–{end} 项，共 {total} 个菜谱",
         countShowingMany: "显示第 {start}–{end} 项，共 {total} 个菜谱",
         noRecipes: "暂无菜谱",
+        viewGrid: "切换到网格视图",
+        viewList: "切换到列表视图",
       },
       form: {
         add: "添加菜谱",
@@ -262,6 +267,7 @@ window.I18N = (function () {
         addTags: "添加标签",
         addImages: "添加图片",
         delete: "删除",
+        menu: "菜谱操作",
         minutes: "{n} 分钟",
       },
       status: {
