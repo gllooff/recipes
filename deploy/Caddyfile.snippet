@@ -1,5 +1,16 @@
 # recipe.jys-reality.win -- plain HTTP backend on 127.0.0.1:8082.
 # Append to /etc/caddy/Caddyfile on the Droplet and run: systemctl reload caddy
+# Requires a Caddy built with github.com/mholt/caddy-ratelimit.
 recipe.jys-reality.win {
+	rate_limit {
+		zone recipes_login {
+			match {
+				path /api/auth/login
+			}
+			key {remote_host}
+			events 60
+			window 1m
+		}
+	}
 	reverse_proxy 127.0.0.1:8082
 }
